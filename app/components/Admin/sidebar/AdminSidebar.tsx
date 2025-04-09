@@ -148,7 +148,7 @@ const AdminSidebar = () => {
                   alt="profile-user"
                   width={100}
                   height={100}
-                  src={"/"}
+                  src={"/avatar.png"}
                   style={{
                     cursor: "pointer",
                     borderRadius: "50%",
@@ -240,6 +240,14 @@ const AdminSidebar = () => {
             >
               {!isCollapsed && "Tùy chỉnh"}
             </Typography>
+
+            <Item
+              title="FAQ"
+              to="/admin/faq"
+              icon={<QuizIcon className="text-black dark:text-white" />}
+              selected={selected}
+              setSelected={setSelected}
+            />
            
             <Item
               title="Danh mục"
@@ -271,7 +279,7 @@ const AdminSidebar = () => {
               className="!text-[18px] text-black dark:text-[#ffffffc1] capitalize !font-[400]"
               sx={{ m: "15px 0 5px 20px" }}
             >
-              {!isCollapsed && "Phân tích"}
+              {!isCollapsed && "Thống kê"}
             </Typography>
             <Item
               title="Khóa học"

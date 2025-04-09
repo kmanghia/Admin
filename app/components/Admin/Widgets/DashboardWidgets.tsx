@@ -6,9 +6,11 @@ import { Box, CircularProgress } from "@mui/material";
 import OrdersAnalytics from "../Analytics/OrdersAnalytics";
 import AllInvoices from "../Order/AllInvoices";
 import {
+  useGetCoursesAnalyticsQuery,
   useGetOrdersAnalyticsQuery,
   useGetUsersAnalyticsQuery,
 } from "@/redux/features/analytics/analyticsApi";
+import CourseAnalytics from "../Analytics/CourseAnalytics";
 
 type Props = {
   open?: boolean;
@@ -45,27 +47,32 @@ const CircularProgressWithLabel: FC<Props> = ({ open, value }) => {
 const DashboardWidgets: FC<Props> = ({ open }) => {
   const [ordersComparePercentage, setOrdersComparePercentage] = useState<any>();
   const [userComparePercentage, setuserComparePercentage] = useState<any>();
-
+  const [courseComparePercentage, setcourseComparePercentage] = useState<any>();
   const { data, isLoading } = useGetUsersAnalyticsQuery({});
+  const { data: courseData, isLoading: courseLoading } = useGetCoursesAnalyticsQuery({});
   const { data: ordersData, isLoading: ordersLoading } =
     useGetOrdersAnalyticsQuery({});
 
   useEffect(() => {
-    if (isLoading && ordersLoading) {
+    if (isLoading && ordersLoading && courseLoading) {
       return;
     } else {
-      if (data && ordersData) {
+      if (data && ordersData && courseData) {
         const usersLastTwoMonths = data.users.last12Months.slice(-2);
         const ordersLastTwoMonths = ordersData.orders.last12Months.slice(-2);
+        const courseLastTwoMonths = courseData.courses.last12Months.slice(-2);
 
         if (
           usersLastTwoMonths.length === 2 &&
-          ordersLastTwoMonths.length === 2
+          ordersLastTwoMonths.length === 2 &&
+          courseLastTwoMonths.length === 2
         ) {
           const usersCurrentMonth = usersLastTwoMonths[1].count;
           const usersPreviousMonth = usersLastTwoMonths[0].count;
           const ordersCurrentMonth = ordersLastTwoMonths[1].count;
           const ordersPreviousMonth = ordersLastTwoMonths[0].count;
+          const courseCurrentMonth = courseLastTwoMonths[1].count;
+          const coursePreviousMonth = courseLastTwoMonths[0].count;
 
           const usersPercentChange = usersPreviousMonth !== 0 ?
             ((usersCurrentMonth - usersPreviousMonth) / usersPreviousMonth) *
@@ -73,6 +80,10 @@ const DashboardWidgets: FC<Props> = ({ open }) => {
 
           const ordersPercentChange = ordersPreviousMonth !== 0 ?
             ((ordersCurrentMonth - ordersPreviousMonth) / ordersPreviousMonth) *
+            100 : 100;
+
+          const coursePercentChange = coursePreviousMonth !== 0 ?
+            ((courseCurrentMonth - coursePreviousMonth) / coursePreviousMonth) *
             100 : 100;
 
           setuserComparePercentage({
@@ -86,10 +97,16 @@ const DashboardWidgets: FC<Props> = ({ open }) => {
             previousMonth: ordersPreviousMonth,
             percentChange: ordersPercentChange,
           });
+
+          setcourseComparePercentage({
+            currentMonth: courseCurrentMonth,
+            previousMonth: coursePreviousMonth,
+            percentChange: coursePercentChange,
+          });
         }
       }
     }
-  }, [isLoading, ordersLoading, data, ordersData]);
+  }, [isLoading, ordersLoading, data, ordersData, courseLoading, courseData]);
 
   return (
     <div className="mt-[30px] min-h-screen">
@@ -108,6 +125,11 @@ const DashboardWidgets: FC<Props> = ({ open }) => {
             Giao dịch gần đây
           </h5>
           <AllInvoices isDashboard={true} />
+        </div>
+      </div>
+      <div className="grid grid-cols-[75%,25%]">
+        <div className="p-8 ">
+          <CourseAnalytics isDashboard={true} />
         </div>
       </div>
     </div>

@@ -1,13 +1,14 @@
 import { styles } from "@/app/styles/style";
 import { useGetUsersAnalyticsQuery } from "@/redux/features/analytics/analyticsApi";
-import React, { FC } from "react";
+import React from "react";
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
-  Tooltip,
+  Label,
   ResponsiveContainer,
+  LabelList,
 } from "recharts";
 import Loader from "../../Loader/Loader"
 
@@ -19,13 +20,14 @@ type Props = {
 const UserAnalytics = ({isDashboard}:Props) => {
   const { data, isLoading } = useGetUsersAnalyticsQuery({});
 
- const analyticsData: any = [];
+  const analyticsData: any = [];
 
   data &&
     data.users.last12Months.forEach((item: any) => {
-      analyticsData.push({ name: item.month, count: item.count });
+      analyticsData.push({ name: item.month, uv: item.count });
     });
 
+  const minValue = 0;
 
   return (
     <>
@@ -36,12 +38,12 @@ const UserAnalytics = ({isDashboard}:Props) => {
             <div className={`${!isDashboard ? "mt-[50px]" : "mt-[50px] dark:bg-[#111C43] shadow-sm pb-5 rounded-sm"}`}>
             <div className={`${isDashboard ? "!ml-8 mb-5" : ''}`}>
             <h1 className={`${styles.title} ${isDashboard && '!text-[20px]'} px-5 !text-start`}>
-               Phân tích người dùng
+               Thống kê người dùng
              </h1>
              {
                !isDashboard && (
                  <p className={`${styles.label} px-5`}>
-                 Dữ liệu phân tích 12 tháng qua{" "}
+                 Dữ liệu thống kê 12 tháng qua{" "}
                </p>
                )
              }
@@ -49,25 +51,15 @@ const UserAnalytics = ({isDashboard}:Props) => {
 
          <div className={`w-full ${isDashboard ? 'h-[30vh]' : 'h-screen'} flex items-center justify-center`}>
            <ResponsiveContainer width={isDashboard ? '100%' : '90%'} height={!isDashboard ? "50%" : '100%'}>
-             <AreaChart
-               data={analyticsData}
-               margin={{
-                 top: 20,
-                 right: 30,
-                 left: 0,
-                 bottom: 0,
-               }}
-             >
-               <XAxis dataKey="name" />
-               <YAxis />
-               <Tooltip />
-               <Area
-                 type="monotone"
-                 dataKey="count"
-                 stroke="#4d62d9"
-                 fill="#4d62d9"
-               />
-             </AreaChart>
+             <BarChart width={150} height={300} data={analyticsData}>
+               <XAxis dataKey="name">
+                 <Label offset={0} position="insideBottom" />
+               </XAxis>
+               <YAxis domain={[minValue, "auto"]} />
+               <Bar dataKey="uv" fill="#3faf82">
+                 <LabelList dataKey="uv" position="top" />
+               </Bar>
+             </BarChart>
            </ResponsiveContainer>
          </div>
        </div>

@@ -12,9 +12,11 @@ import Loader from "../../Loader/Loader";
 import { useGetCoursesAnalyticsQuery } from "@/redux/features/analytics/analyticsApi";
 import { styles } from "@/app/styles/style";
 
-type Props = {};
+type Props = {
+  isDashboard?: boolean;
+};
 
-const CourseAnalytics = (props: Props) => {
+const CourseAnalytics = ({ isDashboard }: Props) => {
   const { data, isLoading } = useGetCoursesAnalyticsQuery({});
 
 
@@ -32,18 +34,33 @@ const CourseAnalytics = (props: Props) => {
       {isLoading ? (
         <Loader />
       ) : (
-        <div className="h-screen">
-          <div className="mt-[50px]">
-            <h1 className={`${styles.title} px-5 !text-start`}>
-              Phân tích khóa học
+        <div className={`${isDashboard ? "h-[r0vh] dark:bg-[#111C43] shadow-sm pb-5 rounded-sm" : "h-screen"}`}>
+          <div
+            className={isDashboard ? "mt-[0px] pl-[40px] mb-2" : "mt-[50px]"}
+          >
+            <h1
+              className={`${styles.title} ${
+                isDashboard && "!text-[20px]"
+              } px-5 !text-start`}
+            >
+              Thống kê khóa học
             </h1>
-            <p className={`${styles.label} px-5`}>
-            Dữ liệu phân tích 12 tháng qua{" "}
-            </p>
+            {!isDashboard && (
+              <p className={`${styles.label} px-5`}>
+                Dữ liệu thống kê 12 tháng qua{" "}
+              </p>
+            )}
           </div>
 
-          <div className="w-full h-[90%] flex items-center justify-center">
-            <ResponsiveContainer width="90%" height="50%">
+          <div
+            className={`w-full ${
+              !isDashboard ? "h-[90%]" : "h-full"
+            } flex items-center justify-center`}
+          >
+            <ResponsiveContainer
+              width={isDashboard ? "100%" : "90%"}
+              height={isDashboard ? "120%" : "50%"}
+            >
               <BarChart width={150} height={300} data={analyticsData}>
                 <XAxis dataKey="name">
                   <Label offset={0} position="insideBottom" />

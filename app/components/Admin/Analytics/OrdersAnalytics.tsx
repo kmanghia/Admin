@@ -1,18 +1,16 @@
 import { styles } from "@/app/styles/style";
 import { useGetOrdersAnalyticsQuery } from "@/redux/features/analytics/analyticsApi";
-import React, { useEffect } from "react";
+import React from "react";
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
+  Label,
   ResponsiveContainer,
+  LabelList,
 } from "recharts";
 import Loader from "../../Loader/Loader";
-
 
 type Props = {
   isDashboard?: boolean;
@@ -25,15 +23,17 @@ export default function OrdersAnalytics({ isDashboard }: Props) {
 
   data &&
     data.orders.last12Months.forEach((item: any) => {
-      analyticsData.push({ name: item.name, Count: item.count });
+      analyticsData.push({ name: item.month, uv: item.count });
     });
+
+  const minValue = 0;
 
   return (
     <>
       {isLoading ? (
         <Loader />
       ) : (
-        <div className={isDashboard ? "h-[30vh]" : "h-screen"}>
+        <div className={`${isDashboard ? "h-[30vh] dark:bg-[#111C43] shadow-sm pb-5 rounded-sm" : "h-screen"}`}>
           <div
             className={isDashboard ? "mt-[0px] pl-[40px] mb-2" : "mt-[50px]"}
           >
@@ -42,11 +42,11 @@ export default function OrdersAnalytics({ isDashboard }: Props) {
                 isDashboard && "!text-[20px]"
               } px-5 !text-start`}
             >
-              Phân tích đơn hàng
+              Thống kê đơn hàng
             </h1>
             {!isDashboard && (
               <p className={`${styles.label} px-5`}>
-                Dữ liệu phân tích 12 tháng qua{" "}
+                Dữ liệu thống kê 12 tháng qua{" "}
               </p>
             )}
           </div>
@@ -59,24 +59,15 @@ export default function OrdersAnalytics({ isDashboard }: Props) {
               width={isDashboard ? "100%" : "90%"}
               height={isDashboard ? "100%" : "50%"}
             >
-              <LineChart
-                width={500}
-                height={300}
-                data={analyticsData}
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                {!isDashboard && <Legend />}
-                <Line type="monotone" dataKey="Count" stroke="#82ca9d" />
-              </LineChart>
+              <BarChart width={150} height={300} data={analyticsData}>
+                <XAxis dataKey="name">
+                  <Label offset={0} position="insideBottom" />
+                </XAxis>
+                <YAxis domain={[minValue, "auto"]} />
+                <Bar dataKey="uv" fill="#3faf82">
+                  <LabelList dataKey="uv" position="top" />
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
