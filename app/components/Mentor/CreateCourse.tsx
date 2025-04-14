@@ -1,43 +1,29 @@
 "use client";
-import React, { FC, useEffect, useState } from "react";
-import CourseInformation from "./CourseInformation";
-import CourseOptions from "./CourseOptions";
-import CourseData from "./CourseData";
-import CourseContent from "./CourseContent";
-import CoursePreview from "./CoursePreview";
-import {
-  useEditCourseMutation,
-  useGetAllCoursesQuery,
-} from "../../../../redux/features/courses/coursesApi";
+import React, { useEffect, useState } from "react";
+import { useCreateCourseMutation } from "@/redux/features/courses/coursesApi";
 import { toast } from "react-hot-toast";
 import { redirect } from "next/navigation";
+import CourseInformation from "../Admin/Course/CourseInformation";
+import CourseOptions from "../Admin/Course/CourseOptions";
+import CourseData from "../Admin/Course/CourseData";
+import CourseContent from "../Admin/Course/CourseContent";
+import CoursePreview from "../Admin/Course/CoursePreview";
+import { useCreateCourseDraftMutation } from "@/redux/features/courses/courseApi";
 
-type Props = {
-  id: string;
-  userRole?: string;
-};
+type Props = {};
 
-const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
+const CreateCourse = (props: Props) => {
   const [image, setImage] = useState(null);
   const [video, setVideo] = useState<File[] | null>(null);
   const [demo, setDemo] = useState(null);
   const [demopreviewUrl, setDemoPreviewUrl] = useState<string>('');
-  const [editCourse, { isSuccess, error }] = useEditCourseMutation();
-  const { data, refetch } = useGetAllCoursesQuery(
-    {},
-    { refetchOnMountOrArgChange: true }
-  );
-
-  const editCourseData = data && data.courses.find((i: any) => i._id === id);
+  const [createCourseDraft, { isLoading, isSuccess, error }] =
+  useCreateCourseDraftMutation();
 
   useEffect(() => {
     if (isSuccess) {
-      toast.success("Khóa học đã được cập nhật thành công");
-      if (userRole === "mentor") {
-        redirect("/mentor/courses");
-      } else {
-        redirect("/admin/courses");
-      }
+      toast.success("Khóa học đã được tạo thành công");
+      redirect("/mentor/courses");
     }
     if (error) {
       if ("data" in error) {
@@ -45,38 +31,17 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
         toast.error(errorMessage.data.message);
       }
     }
-  }, [isSuccess, error, userRole]);
+  }, [isSuccess, error]);
 
   const [active, setActive] = useState(0);
-
-  useEffect(() => {
-    if (editCourseData) {
-      console.log(editCourseData);
-      setCourseInfo({
-        name: editCourseData.name,
-        description: editCourseData.description,
-        price: editCourseData.price,
-        estimatedPrice: editCourseData?.estimatedPrice,
-        tags: editCourseData.tags,
-        level: editCourseData.level,
-        categories: editCourseData.categories,
-        demoUrl: editCourseData.demoUrl,
-        thumbnail: editCourseData?.thumbnail?.url ? editCourseData.thumbnail.url : editCourseData.thumbnail,
-      });
-      setBenefits(editCourseData.benefits);
-      setPrerequisites(editCourseData.prerequisites);
-      setCourseContentData(editCourseData.courseData);
-    }
-  }, [editCourseData]);
-
-  const [courseInfo, setCourseInfo] = useState<any>({
+  const [courseInfo, setCourseInfo] = useState({
     name: "",
     description: "",
     price: "",
     estimatedPrice: "",
     tags: "",
     level: "",
-    categories: "",
+    categories:"",
     demoUrl: "",
     thumbnail: "",
   });
@@ -87,7 +52,7 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
       videoUrl: "",
       title: "",
       description: "",
-      videoSection: "Untitled Section",
+      videoSection: "Phần không có tiêu đề",
       videoLength: "",
       links: [
         {
@@ -97,30 +62,31 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
       ],
       iquizz:[{ question: "", options: ["", "", "", ""], correctAnswer: "" }],
       suggestion: "",
-
     },
   ]);
 
+
   const [courseData, setCourseData] = useState({});
 
+
   const handleSubmit = async () => {
-    // Format benefits array
+
     const formattedBenefits = benefits.map((benefit) => ({
       title: benefit.title,
     }));
-    // Format prerequisites array
+  
     const formattedPrerequisites = prerequisites.map((prerequisite) => ({
       title: prerequisite.title,
     }));
 
-    // Format course content array
+
     const formattedCourseContentData = courseContentData.map(
       (courseContent) => ({
         videoUrl: courseContent.videoUrl,
         title: courseContent.title,
         description: courseContent.description,
-        videoSection: courseContent.videoSection,
         videoLength: courseContent.videoLength,
+        videoSection: courseContent.videoSection,
         links: courseContent.links.map((link) => ({
           title: link.title,
           url: link.url,
@@ -134,7 +100,7 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
       })
     );
 
-    //   prepare our data object
+  
     const data = {
       name: courseInfo.name,
       description: courseInfo.description,
@@ -145,30 +111,31 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
       thumbnail: courseInfo.thumbnail,
       level: courseInfo.level,
       demoUrl: courseInfo.demoUrl,
+      totalVideos: courseContentData.length,
       benefits: formattedBenefits,
       prerequisites: formattedPrerequisites,
       courseData: formattedCourseContentData,
     };
-
     setCourseData(data);
   };
 
   const handleCourseCreate = async (e: any) => {
-    
     const formData = new FormData();
-    formData.append('imageedit', image as any);
-    formData.append('demoedit', demo as any)
+    formData.append('image', image as any);
+    formData.append('demo', demo as any)
+    
     if (video) {  
-      for (let i = 0; i < video.length; i++) {       
-         formData.append('videos', video[i] as any);   
-           }  
-    } 
-    // const data = courseData;
+       for (let i = 0; i < video.length; i++) {       
+          formData.append('videos', video[i] as any);   
+            }  
+     } 
+    
     const data = JSON.stringify(courseData);
     formData.append('courseData', data); // Thêm courseData vào FormData
     console.log(formData);
-    console.log(data);
-    await editCourse({ id: editCourseData?._id, data: formData });
+    if (!isLoading) {
+      await createCourseDraft(formData);
+    }
   };
 
   return (
@@ -214,7 +181,6 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
             setActive={setActive}
             courseData={courseData}
             handleCourseCreate={handleCourseCreate}
-            isEdit={true}
             demopreviewUrl={demopreviewUrl}
           />
         )}
@@ -226,4 +192,4 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
   );
 };
 
-export default EditCourse;
+export default CreateCourse; 

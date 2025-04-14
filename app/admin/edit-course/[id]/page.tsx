@@ -23,7 +23,7 @@ const page = ({params}:any) => {
             </div>
             <div className="w-[85%]">
                <DashboardHeader />
-               <EditCourse id={id} />
+               <EditCourse id={id} userRole="admin" />
             </div>
         </div>
     </div>

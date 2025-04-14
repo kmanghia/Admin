@@ -7,6 +7,7 @@ import { styles } from "../../../app/styles/style";
 import { useLoginMutation } from "@/redux/features/auth/authApi";
 import { toast } from "react-hot-toast";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 
 
@@ -111,7 +112,31 @@ type Props = {
           <br />
         </form>
         <br />
-      
+        <div className="flex items-center justify-between w-full">
+          <div
+            className="text-[#2190ff] block cursor-pointer"
+            onClick={() => setRoute("Sign-Up")}
+          >
+            Đăng ký tài khoản
+          </div>
+          <div
+            className="text-[#2190ff] block cursor-pointer"
+            onClick={() => setRoute("Forgot-Password")}
+          >
+            Quên mật khẩu?
+          </div>
+        </div>
+        <div className="mt-4">
+          <Link 
+            href="/become-mentor"
+            className="text-[#2190ff] bg-transparent px-4 py-2 border border-[#2190ff] rounded-md w-full block text-center hover:bg-[#2190ff] hover:text-white transition duration-300"
+            onClick={() => {
+              if (setOpen) setOpen(false);
+            }}
+          >
+            Đăng ký trở thành Mentor
+          </Link>
+        </div>
       </div>
     );
   };

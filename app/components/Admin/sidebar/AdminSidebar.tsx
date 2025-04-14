@@ -67,9 +67,23 @@ const AdminSidebar = () => {
   }
 
   const logoutHandler = async () => {
+    // Xóa cookies cũ (để tương thích ngược)
     Cookies.remove("accessToken");
     Cookies.remove("refreshToken");
-    window.location.reload();
+    
+    // Xóa token trong localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("admin_accessToken");
+      localStorage.removeItem("admin_refreshToken");
+      localStorage.removeItem("current_role");
+      
+      // Xóa cả sessionStorage cho an toàn
+      sessionStorage.removeItem("userRole");
+      sessionStorage.removeItem("tabSessionId");
+    }
+    
+    // Chuyển hướng đến trang chính
+    window.location.href = "/";
   };
 
   return (
@@ -270,6 +284,13 @@ const AdminSidebar = () => {
               icon={
                 <PeopleOutlinedIcon className="text-black dark:text-white" />
               }
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Khóa học chờ duyệt"
+              to="/admin/pending-courses"
+              icon={<OndemandVideoIcon className="text-black dark:text-white" />}
               selected={selected}
               setSelected={setSelected}
             />

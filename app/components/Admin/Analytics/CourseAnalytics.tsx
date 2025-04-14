@@ -34,7 +34,7 @@ const CourseAnalytics = ({ isDashboard }: Props) => {
       {isLoading ? (
         <Loader />
       ) : (
-        <div className={`${isDashboard ? "h-[r0vh] dark:bg-[#111C43] shadow-sm pb-5 rounded-sm" : "h-screen"}`}>
+        <div className={`${isDashboard ? "h-[30vh] dark:bg-[#111C43] shadow-sm pb-5 rounded-sm" : "h-screen"}`}>
           <div
             className={isDashboard ? "mt-[0px] pl-[40px] mb-2" : "mt-[50px]"}
           >
@@ -59,7 +59,7 @@ const CourseAnalytics = ({ isDashboard }: Props) => {
           >
             <ResponsiveContainer
               width={isDashboard ? "100%" : "90%"}
-              height={isDashboard ? "120%" : "50%"}
+              height={isDashboard ? "100%" : "50%"}
             >
               <BarChart width={150} height={300} data={analyticsData}>
                 <XAxis dataKey="name">

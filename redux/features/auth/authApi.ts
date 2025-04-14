@@ -20,13 +20,26 @@ export const authApi = apiSlice.injectEndpoints({
       async onQueryStarted(arg, { queryFulfilled, dispatch }) {
         try {
           const result = await queryFulfilled;
-          Cookies.set("accessToken", result.data.accessToken);
-          Cookies.set("refreshToken", result.data.refreshToken);
+          const user = result.data.user;
+          const accessToken = result.data.accessToken;
+          const refreshToken = result.data.refreshToken;
+
+          // Hỗ trợ tương thích ngược với cookie
+          Cookies.set("accessToken", accessToken);
+          Cookies.set("refreshToken", refreshToken);
+          
+          // Lưu token theo role trong localStorage
+          if (user && (user.role === "admin" || user.role === "mentor")) {
+            localStorage.setItem(`${user.role}_accessToken`, accessToken);
+            localStorage.setItem(`${user.role}_refreshToken`, refreshToken);
+            localStorage.setItem("current_role", user.role);
+          }
+          
           dispatch(
             userLoggedIn({
-              accessToken: result.data.accessToken,
-              refreshToken: result.data.refreshToken,
-              user: result.data.user,
+              accessToken,
+              refreshToken,
+              user,
             })
           );
         } catch (error: any) {
@@ -42,6 +55,18 @@ export const authApi = apiSlice.injectEndpoints({
       }),
       async onQueryStarted(arg, { queryFulfilled, dispatch }) {
         try {
+          // Xác định role hiện tại để xóa đúng token
+          const currentRole = localStorage.getItem("current_role");
+          if (currentRole) {
+            localStorage.removeItem(`${currentRole}_accessToken`);
+            localStorage.removeItem(`${currentRole}_refreshToken`);
+            localStorage.removeItem("current_role");
+          }
+          
+          // Xóa cookies cho tương thích ngược
+          Cookies.remove("accessToken");
+          Cookies.remove("refreshToken");
+          
           dispatch(userLoggedOut());
         } catch (error: any) {
           console.log(error);
