@@ -109,7 +109,7 @@ const AllInvoices = ({ isDashboard }: Props) => {
     });
 
   return (
-    <div className={!isDashboard ? "mt-[120px]" : "mt-[0px]"}>
+    <div className={!isDashboard ? "mt-[120px] ml-[30px]" : "mt-[0px] ml-[30px]"}>
       {isLoading ? (
         <Loader />
       ) : (

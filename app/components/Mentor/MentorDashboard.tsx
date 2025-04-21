@@ -8,9 +8,10 @@ import {
   StarIcon,
 } from "../Admin/sidebar/Icon";
 import { useSelector } from "react-redux";
-import { useGetMentorInfoQuery } from "@/redux/features/mentor/mentorApi";
+import { useGetMentorInfoQuery, useGetMentorStudentsQuery } from "@/redux/features/mentor/mentorApi";
 import Loader from "../Loader/Loader";
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 type Props = {};
 
@@ -22,302 +23,361 @@ const MentorDashboard = (props: Props) => {
   const [totalStudents, setTotalStudents] = useState(0);
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [averageRating, setAverageRating] = useState(0);
+  const { isLoading: studentsLoading, data: studentsData } = useGetMentorStudentsQuery({}, { refetchOnMountOrArgChange: true });
 
-  console.log(data)
+  useEffect(() => {
+    if (studentsData?.success && studentsData?.students) {
+      console.log("Students data:", studentsData.students);
+      setTotalStudents(studentsData.students.length);
+    }
+  }, [studentsData]);
+
   useEffect(() => {
     if (data) {
       setTotalCourses(data?.mentor?.courses?.length || 0);
-      
-      // Calculate total students (purchased courses)
-      let students = 0;
       let earnings = 0;
       data?.mentor?.courses?.forEach((course: any) => {
-        students += course.purchased || 0;
         earnings += (course.purchased || 0) * course.price;
       });
-      setTotalStudents(students);
       setTotalEarnings(earnings);
       setAverageRating(data?.mentor?.averageRating || 0);
     }
   }, [data]);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.3 }
+    }
+  };
+
+  const gradientColors = {
+    courses: theme === "dark" ? 
+      "linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)" : 
+      "linear-gradient(135deg, #FF6B6B 0%, #FFA07A 100%)",
+    students: theme === "dark" ? 
+      "linear-gradient(135deg, #4158D0 0%, #C850C0 100%)" : 
+      "linear-gradient(135deg, #0093E9 0%, #80D0C7 100%)",
+    rating: theme === "dark" ? 
+      "linear-gradient(135deg, #FFCC33 0%, #FFB347 100%)" : 
+      "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+    earnings: theme === "dark" ? 
+      "linear-gradient(135deg, #00B09B 0%, #96C93D 100%)" : 
+      "linear-gradient(135deg, #00B09B 0%, #96C93D 100%)"
+  };
+
+  const StatCard = ({ title, value, icon: Icon, gradient }: any) => (
+    <motion.div
+      variants={itemVariants}
+      className="w-full"
+      whileHover={{ 
+        scale: 1.03,
+        transition: { duration: 0.2 }
+      }}
+    >
+      <Box
+        sx={{
+          background: gradient,
+          color: "#fff",
+          p: "25px",
+          borderRadius: "20px",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: "0 10px 20px rgba(0,0,0,0.1)",
+          "&::before": {
+            content: '""',
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(255,255,255,0.1)",
+            transform: "translateX(-100%)",
+            transition: "transform 0.5s ease",
+          },
+          "&:hover::before": {
+            transform: "translateX(100%)",
+          }
+        }}
+      >
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+            position: "relative",
+            zIndex: 1
+                  }}
+                >
+                  <Box>
+                    <Typography
+              variant="h3"
+              sx={{
+                fontWeight: "bold",
+                mb: 1,
+                textShadow: "2px 2px 4px rgba(0,0,0,0.2)"
+              }}
+            >
+              {value}
+                    </Typography>
+                    <Typography
+              variant="body1"
+              sx={{
+                fontWeight: 500,
+                opacity: 0.9,
+                fontSize: "1.1rem"
+              }}
+            >
+              {title}
+                    </Typography>
+                  </Box>
+          <Box
+            sx={{
+              backgroundColor: "rgba(255,255,255,0.2)",
+              borderRadius: "50%",
+              p: "15px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backdropFilter: "blur(5px)"
+            }}
+          >
+            <Icon className="text-[35px]" />
+          </Box>
+                  </Box>
+                </Box>
+    </motion.div>
+  );
+
+  const ActionCard = ({ title, icon: Icon, href, gradient }: any) => (
+    <Link href={href}>
+      <motion.div
+        whileHover={{ 
+          scale: 1.05,
+          rotate: [0, -1, 1, -1, 0],
+          transition: { duration: 0.2 }
+        }}
+        whileTap={{ scale: 0.95 }}
+        className="w-full"
+      >
+        <Box
+          sx={{
+            background: gradient,
+            color: "#fff",
+            p: "30px",
+            borderRadius: "20px",
+            textAlign: "center",
+            position: "relative",
+            overflow: "hidden",
+            boxShadow: "0 10px 20px rgba(0,0,0,0.1)",
+            "&::after": {
+              content: '""',
+              position: "absolute",
+              top: "-50%",
+              left: "-50%",
+              width: "200%",
+              height: "200%",
+              background: "radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 50%)",
+              opacity: 0,
+              transition: "opacity 0.3s ease",
+            },
+            "&:hover::after": {
+              opacity: 1,
+            }
+          }}
+        >
+                <Box
+                  sx={{
+              backgroundColor: "rgba(255,255,255,0.15)",
+              borderRadius: "50%",
+              width: "80px",
+              height: "80px",
+                    display: "flex",
+                    alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 20px",
+              backdropFilter: "blur(5px)",
+              border: "2px solid rgba(255,255,255,0.2)"
+            }}
+          >
+            <Icon className="text-[40px]" />
+          </Box>
+                    <Typography
+                      variant="h5"
+            sx={{
+              fontWeight: 600,
+              textShadow: "2px 2px 4px rgba(0,0,0,0.2)"
+            }}
+          >
+            {title}
+                    </Typography>
+                  </Box>
+      </motion.div>
+    </Link>
+  );
+
   return (
     <>
-      {isLoading ? (
+      {isLoading || studentsLoading ? (
         <Loader />
       ) : (
-        <Box m="20px">
-          <Box
-            display="flex"
-            flexDirection="column"
-            justifyContent="space-between"
+        <Box 
+          className="min-h-screen"
+          sx={{ 
+            p: { xs: "20px", md: "40px" },
+            background: theme === "dark" 
+              ? "linear-gradient(135deg, #1a1f2c 0%, #2d3748 100%)"
+              : "linear-gradient(135deg, #f0f2f5 0%, #ffffff 100%)",
+          }}
+        >
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
           >
-            <Box mb="20px">
-              <Typography
-                variant="h2"
-                color={theme === "dark" ? "#fff" : "#000"}
-                fontWeight="bold"
-                sx={{ m: "0 0 5px 0" }}
-              >
-                Xin chào, {user?.name}
-              </Typography>
-              <Typography variant="h5" color={theme === "dark" ? "#04d882" : "#1565c0"}>
-                Chào mừng đến với bảng điều khiển Mentor
-              </Typography>
-            </Box>
-
-            {/* Hiển thị trạng thái phê duyệt
-            {data?.mentor?.applicationStatus === "pending" && (
-              <Box
-                className="w-full bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-6"
-                sx={{ color: "rgb(180, 83, 9)" }}
-              >
-                <p className="font-semibold">Tài khoản mentor của bạn đang chờ phê duyệt</p>
-                <p className="text-sm">Một số tính năng có thể bị hạn chế cho đến khi tài khoản của bạn được phê duyệt.</p>
-              </Box>
-            )}
-
-            {data?.mentor?.applicationStatus === "rejected" && (
-              <Box
-                className="w-full bg-red-100 border-l-4 border-red-500 p-4 mb-6"
-                sx={{ color: "rgb(185, 28, 28)" }}
-              >
-                <p className="font-semibold">Tài khoản mentor của bạn đã bị từ chối</p>
-                <p className="text-sm">Vui lòng liên hệ với bộ phận hỗ trợ để biết thêm thông tin.</p>
-              </Box>
-            )} */}
-
-            {/* GRID & CHARTS */}
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Box
+            {/* Welcome Section */}
+            <Box 
+              sx={{
+                background: theme === "dark"
+                  ? "linear-gradient(135deg, #2d3748 0%, #1a1f2c 100%)"
+                  : "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)",
+                borderRadius: "30px",
+                p: "40px",
+                mb: "40px",
+                boxShadow: theme === "dark" 
+                  ? "0 20px 40px rgba(0,0,0,0.3)"
+                  : "0 20px 40px rgba(0,0,0,0.1)",
+                position: "relative",
+                overflow: "hidden",
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: "5px",
+                  background: "linear-gradient(90deg, #FF6B6B, #4158D0, #FFCC33, #00B09B)",
+                }
+              }}
+            >
+              <motion.div variants={itemVariants}>
+                <Typography
+                  variant="h2"
                   sx={{
-                    backgroundColor: theme === "dark" ? "#1F2A40" : "#F2F0F0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    p: "15px",
-                    borderRadius: "4px"
+                    color: theme === "dark" ? "#fff" : "#1a202c",
+                    fontWeight: "bold",
+                    mb: 2,
+                    background: "linear-gradient(90deg, #FF6B6B, #4158D0)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
                   }}
                 >
-                  <Box>
+                  Xin chào, {user?.name}
+                </Typography>
                     <Typography
                       variant="h5"
-                      fontWeight="bold"
-                      sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                    >
-                      {totalCourses}
+                  sx={{
+                    color: theme === "dark" ? "#a0aec0" : "#4a5568",
+                    fontWeight: "normal"
+                  }}
+                >
+                  Chào mừng đến với bảng điều khiển giảng viên
                     </Typography>
-                    <Typography
-                      variant="h6"
-                      sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                    >
-                      Khóa học
-                    </Typography>
+              </motion.div>
                   </Box>
-                  <Box>
-                    <VideoCallIcon
-                      className={`${
-                        theme === "dark" ? "text-[#23d18b]" : "text-[#1565c0]"
-                      } text-[40px]`}
-                    />
-                  </Box>
-                </Box>
+
+            {/* Stats Grid */}
+            <Grid container spacing={3} sx={{ mb: 5 }}>
+              <Grid item xs={12} sm={6} md={3}>
+                <StatCard
+                  title="Khóa học"
+                  value={totalCourses}
+                  icon={VideoCallIcon}
+                  gradient={gradientColors.courses}
+                />
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
-                <Box
-                  sx={{
-                    backgroundColor: theme === "dark" ? "#1F2A40" : "#F2F0F0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    p: "15px",
-                    borderRadius: "4px"
-                  }}
-                >
-                  <Box>
-                    <Typography
-                      variant="h5"
-                      fontWeight="bold"
-                      sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                    >
-                      {totalStudents}
-                    </Typography>
-                    <Typography
-                      variant="h6"
-                      sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                    >
-                      Học viên
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <PeopleOutlinedIcon
-                      className={`${
-                        theme === "dark" ? "text-[#23d18b]" : "text-[#1565c0]"
-                      } text-[40px]`}
-                    />
-                  </Box>
-                </Box>
+                <StatCard
+                  title="Học viên"
+                  value={totalStudents}
+                  icon={PeopleOutlinedIcon}
+                  gradient={gradientColors.students}
+                />
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
-                <Box
-                  sx={{
-                    backgroundColor: theme === "dark" ? "#1F2A40" : "#F2F0F0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    p: "15px",
-                    borderRadius: "4px"
-                  }}
-                >
-                  <Box>
-                    <Typography
-                      variant="h5"
-                      fontWeight="bold"
-                      sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                    >
-                      {averageRating.toFixed(1)}
-                    </Typography>
-                    <Typography
-                      variant="h6"
-                      sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                    >
-                      Đánh giá
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <StarIcon
-                      className={`${
-                        theme === "dark" ? "text-[#23d18b]" : "text-[#1565c0]"
-                      } text-[40px]`}
-                    />
-                  </Box>
-                </Box>
+                <StatCard
+                  title="Đánh giá"
+                  value={averageRating.toFixed(1)}
+                  icon={StarIcon}
+                  gradient={gradientColors.rating}
+                />
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
-                <Box
-                  sx={{
-                    backgroundColor: theme === "dark" ? "#1F2A40" : "#F2F0F0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    p: "15px",
-                    borderRadius: "4px"
-                  }}
-                >
-                  <Box>
-                    <Typography
-                      variant="h5"
-                      fontWeight="bold"
-                      sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                    >
-                      {totalEarnings.toLocaleString("vi-VN")}đ
-                    </Typography>
-                    <Typography
-                      variant="h6"
-                      sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                    >
-                      Thu nhập
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <BarChartOutlinedIcon
-                      className={`${
-                        theme === "dark" ? "text-[#23d18b]" : "text-[#1565c0]"
-                      } text-[40px]`}
-                    />
-                  </Box>
-                </Box>
+                <StatCard
+                  title="Thu nhập"
+                  value={`${totalEarnings.toLocaleString("vi-VN")}đ`}
+                  icon={BarChartOutlinedIcon}
+                  gradient={gradientColors.earnings}
+                />
               </Grid>
             </Grid>
 
-            {/* Actions */}
-            <Box mt="30px">
+            {/* Quick Actions */}
+            <Box sx={{ mb: 4 }}>
               <Typography
-                variant="h5"
-                sx={{ color: theme === "dark" ? "#fff" : "#000", mb: 2 }}
+                variant="h4"
+                sx={{
+                  color: theme === "dark" ? "#fff" : "#1a202c",
+                  fontWeight: "bold",
+                  mb: 4,
+                  textAlign: "center",
+                  textShadow: theme === "dark" 
+                    ? "2px 2px 4px rgba(0,0,0,0.3)"
+                    : "2px 2px 4px rgba(0,0,0,0.1)"
+                }}
               >
                 Hành động nhanh
               </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Link href="/mentor/create-course">
-                    <Box
-                      sx={{
-                        backgroundColor: theme === "dark" ? "#1F2A40" : "#F2F0F0",
-                        p: "15px",
-                        borderRadius: "4px",
-                        textAlign: "center"
-                      }}
-                      className="hover:opacity-90 transition-all cursor-pointer"
-                    >
-                      <VideoCallIcon
-                        className={`${
-                          theme === "dark" ? "text-[#23d18b]" : "text-[#1565c0]"
-                        } text-[40px] mx-auto mb-2`}
-                      />
-                      <Typography
-                        variant="h6"
-                        sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                      >
-                        Tạo khóa học mới
-                      </Typography>
-                    </Box>
-                  </Link>
+              <Grid container spacing={4}>
+                <Grid item xs={12} sm={6} md={4}>
+                  <ActionCard
+                    title="Tạo khóa học mới"
+                    icon={VideoCallIcon}
+                    href="/mentor/create-course"
+                    gradient={gradientColors.courses}
+                  />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Link href="/mentor/courses">
-                    <Box
-                      sx={{
-                        backgroundColor: theme === "dark" ? "#1F2A40" : "#F2F0F0",
-                        p: "15px",
-                        borderRadius: "4px",
-                        textAlign: "center"
-                      }}
-                      className="hover:opacity-90 transition-all cursor-pointer"
-                    >
-                      <BarChartOutlinedIcon
-                        className={`${
-                          theme === "dark" ? "text-[#23d18b]" : "text-[#1565c0]"
-                        } text-[40px] mx-auto mb-2`}
-                      />
-                      <Typography
-                        variant="h6"
-                        sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                      >
-                        Quản lý khóa học
-                      </Typography>
-                    </Box>
-                  </Link>
+                <Grid item xs={12} sm={6} md={4}>
+                  <ActionCard
+                    title="Quản lý khóa học"
+                    icon={BarChartOutlinedIcon}
+                    href="/mentor/courses"
+                    gradient={gradientColors.students}
+                  />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Link href="/mentor/reviews">
-                    <Box
-                      sx={{
-                        backgroundColor: theme === "dark" ? "#1F2A40" : "#F2F0F0",
-                        p: "15px",
-                        borderRadius: "4px",
-                        textAlign: "center"
-                      }}
-                      className="hover:opacity-90 transition-all cursor-pointer"
-                    >
-                      <StarIcon
-                        className={`${
-                          theme === "dark" ? "text-[#23d18b]" : "text-[#1565c0]"
-                        } text-[40px] mx-auto mb-2`}
-                      />
-                      <Typography
-                        variant="h6"
-                        sx={{ color: theme === "dark" ? "#fff" : "#000" }}
-                      >
-                        Xem đánh giá
-                      </Typography>
-                    </Box>
-                  </Link>
+                <Grid item xs={12} sm={6} md={4}>
+                  <ActionCard
+                    title="Xem đánh giá"
+                    icon={StarIcon}
+                    href="/mentor/reviews"
+                    gradient={gradientColors.rating}
+                  />
                 </Grid>
               </Grid>
             </Box>
-          </Box>
+          </motion.div>
         </Box>
       )}
     </>

@@ -58,7 +58,7 @@ const CourseData: FC<Props> = ({
   };
 
   return (
-    <div className="w-[80%] m-auto mt-24 block">
+    <div className="w-[80%] ml-[30px] m-auto mt-24 block">
       <div>
         <label className={`${styles.label} text-[20px]`} htmlFor="email">
           Lợi ích của học viên khi tham gia khóa học này là gì?

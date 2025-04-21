@@ -25,19 +25,39 @@ const CourseInformation: FC<Props> = ({
   const { data } = useGetHeroDataQuery("Categories", {});
   const [categories, setCategories] = useState([]);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [videoDemoUrl, setVideoDemoUrl] = useState<string>('');
+  
   useEffect(() => {
     if (data) {
       setCategories(data.layout.categories);
     }
   }, [data]);
 
+  // Hiển thị video demo có sẵn khi chỉnh sửa khóa học
+  useEffect(() => {
+    if (courseInfo?.demoUrl && !videoDemoUrl) {
+      // Nếu demoUrl không phải là URL đầy đủ, thêm base URL
+      if (courseInfo.demoUrl.startsWith('http')) {
+        setVideoDemoUrl(courseInfo.demoUrl);
+        setDemoPreviewUrl(courseInfo.demoUrl);
+      } else {
+        const fullUrl = `http://localhost:8000/videos/${courseInfo.demoUrl}`;
+        setVideoDemoUrl(fullUrl);
+        setDemoPreviewUrl(fullUrl);
+      }
+    }
+  }, [courseInfo, videoDemoUrl, setDemoPreviewUrl]);
+
   useEffect(() => {
     return () => {
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
       }
+      if (videoDemoUrl && videoDemoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(videoDemoUrl);
+      }
     };
-  }, [previewUrl]);
+  }, [previewUrl, videoDemoUrl]);
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
@@ -78,9 +98,19 @@ const CourseInformation: FC<Props> = ({
     }
   };
 
+  const handleDemoChange = (e: any) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setDemo(file);
+      // Tạo preview URL cho video demo
+      const objectUrl = URL.createObjectURL(file);
+      setDemoPreviewUrl(objectUrl);
+      setVideoDemoUrl(objectUrl);
+    }
+  };
 
   return (
-    <div className="w-[80%] m-auto mt-24">
+    <div className="w-[80%] ml-[30px] m-auto mt-24">
       <form onSubmit={handleSubmit} className={`${styles.label}`}>
         <div>
           <label htmlFor="">Tên khóa học</label>
@@ -214,21 +244,23 @@ const CourseInformation: FC<Props> = ({
           <div className="w-[50%]">
             <label className={`${styles.label} w-[50%]`}>Demo</label>
             <input
-                      type="file"
-                      accept="video/*"
-                      placeholder="sdder"
-                      className={`${styles.input}`}
-                      onChange={(e) => { 
-                        const file = e.target.files?.[0];
-                        if (file) {
-                        setDemo(file);
-                        console.log(file)
-                        // Tạo preview URL
-                       const objectUrl = URL.createObjectURL(file);
-                       setDemoPreviewUrl(objectUrl);
-                       }
-                      }}
-                    />
+              type="file"
+              accept="video/*"
+              placeholder="sdder"
+              className={`${styles.input}`}
+              onChange={handleDemoChange}
+            />
+            {videoDemoUrl && (
+              <div className="mt-2">
+                <video 
+                  controls 
+                  className="w-full h-auto mt-2" 
+                  src={videoDemoUrl}
+                >
+                  Trình duyệt của bạn không hỗ trợ thẻ video.
+                </video>
+              </div>
+            )}
           </div>
         </div>
         <br />

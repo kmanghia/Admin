@@ -1,6 +1,6 @@
 import { styles } from "@/app/styles/style";
 import { useGetOrdersAnalyticsQuery } from "@/redux/features/analytics/analyticsApi";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -9,8 +9,11 @@ import {
   Label,
   ResponsiveContainer,
   LabelList,
+  Tooltip,
+  CartesianGrid,
 } from "recharts";
 import Loader from "../../Loader/Loader";
+import { motion } from "framer-motion";
 
 type Props = {
   isDashboard?: boolean;
@@ -18,8 +21,35 @@ type Props = {
 
 export default function OrdersAnalytics({ isDashboard }: Props) {
   const {data, isLoading } = useGetOrdersAnalyticsQuery({});
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [growthRate, setGrowthRate] = useState(0);
+  const [animate, setAnimate] = useState(false);
 
   const analyticsData: any = [];
+
+  useEffect(() => {
+    if (data) {
+      // Tính tổng đơn hàng
+      let total = 0;
+      data.orders.last12Months.forEach((item: any) => {
+        total += item.count;
+      });
+      setTotalOrders(total);
+
+      // Tính tỷ lệ tăng trưởng (so sánh 2 tháng gần nhất)
+      const lastTwoMonths = data.orders.last12Months.slice(-2);
+      if (lastTwoMonths.length === 2) {
+        const currentMonth = lastTwoMonths[1].count;
+        const prevMonth = lastTwoMonths[0].count;
+        if (prevMonth > 0) {
+          const growth = ((currentMonth - prevMonth) / prevMonth) * 100;
+          setGrowthRate(growth);
+        }
+      }
+
+      setAnimate(true);
+    }
+  }, [data]);
 
   data &&
     data.orders.last12Months.forEach((item: any) => {
@@ -28,49 +58,139 @@ export default function OrdersAnalytics({ isDashboard }: Props) {
 
   const minValue = 0;
 
+  // Custom Tooltip for better data display
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white dark:bg-gray-800 p-3 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700">
+          <p className="font-medium text-gray-700 dark:text-gray-300">{`${label}`}</p>
+          <p className="text-emerald-600 dark:text-emerald-400 font-semibold">{`Số đơn hàng: ${payload[0].value}`}</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <>
       {isLoading ? (
         <Loader />
       ) : (
-        <div className={`${isDashboard ? "h-[30vh] dark:bg-[#111C43] shadow-sm pb-5 rounded-sm" : "h-screen"}`}>
-          <div
-            className={isDashboard ? "mt-[0px] pl-[40px] mb-2" : "mt-[50px]"}
-          >
-            <h1
-              className={`${styles.title} ${
-                isDashboard && "!text-[20px]"
-              } px-5 !text-start`}
-            >
-              Thống kê đơn hàng
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className={`${
+            isDashboard
+              ? "h-[100%] dark:bg-[#111C43] bg-white shadow-md rounded-lg overflow-hidden"
+              : "min-h-[80vh] bg-white dark:bg-gray-900 p-5 rounded-lg shadow-md"
+          }`}
+        >
+          <div className={`${isDashboard ? "p-4" : "mt-8 p-5"}`}>
+            <h1 className={`${styles.title} ${isDashboard && "!text-[20px]"} !text-start flex items-center`}>
+              <span className="mr-2">💰</span> Thống kê đơn hàng
             </h1>
             {!isDashboard && (
-              <p className={`${styles.label} px-5`}>
-                Dữ liệu thống kê 12 tháng qua{" "}
+              <p className={`${styles.label} mt-2 mb-6 text-gray-600 dark:text-gray-400`}>
+                Dữ liệu thống kê 12 tháng qua
               </p>
             )}
+
+            {!isDashboard && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-lg p-4 text-white shadow-lg"
+                >
+                  <h3 className="text-lg font-semibold mb-1 opacity-90">Tổng đơn hàng</h3>
+                  <div className="text-3xl font-bold">{totalOrders}</div>
+                  <p className="text-sm mt-3 opacity-80">Tổng số đơn hàng trong 12 tháng qua</p>
+                </motion.div>
+
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg p-4 text-white shadow-lg"
+                >
+                  <h3 className="text-lg font-semibold mb-1 opacity-90">Tăng trưởng</h3>
+                  <div className="text-3xl font-bold flex items-center">
+                    {growthRate.toFixed(1)}%
+                    {growthRate > 0 ? (
+                      <span className="ml-2 text-emerald-200">↑</span>
+                    ) : (
+                      <span className="ml-2 text-red-300">↓</span>
+                    )}
+                  </div>
+                  <p className="text-sm mt-3 opacity-80">So với tháng trước</p>
+                </motion.div>
+
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-lg p-4 text-white shadow-lg"
+                >
+                  <h3 className="text-lg font-semibold mb-1 opacity-90">Trung bình hàng tháng</h3>
+                  <div className="text-3xl font-bold">
+                    {(totalOrders / (analyticsData.length || 1)).toFixed(1)}
+                  </div>
+                  <p className="text-sm mt-3 opacity-80">Đơn hàng mới mỗi tháng</p>
+                </motion.div>
+              </div>
+            )}
           </div>
-          <div
-            className={`w-full ${
-              !isDashboard ? "h-[90%]" : "h-full"
-            } flex items-center justify-center`}
-          >
-            <ResponsiveContainer
-              width={isDashboard ? "100%" : "90%"}
-              height={isDashboard ? "100%" : "50%"}
-            >
-              <BarChart width={150} height={300} data={analyticsData}>
-                <XAxis dataKey="name">
-                  <Label offset={0} position="insideBottom" />
+
+          <div className={`w-full ${!isDashboard ? "h-[60vh]" : "h-full"} flex items-center justify-center px-2`}>
+            <ResponsiveContainer width="100%" height={isDashboard ? "80%" : "80%"}>
+              <BarChart 
+                data={analyticsData} 
+                margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#ccc" opacity={0.1} vertical={false} />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fill: '#555', fontSize: 12 }}
+                  tickLine={false}
+                  axisLine={{ stroke: '#E0E0E0' }}
+                >
+                  <Label offset={-5} position="insideBottom" />
                 </XAxis>
-                <YAxis domain={[minValue, "auto"]} />
-                <Bar dataKey="uv" fill="#3faf82">
-                  <LabelList dataKey="uv" position="top" />
+                <YAxis 
+                  domain={[minValue, 'auto']} 
+                  tick={{ fill: '#555', fontSize: 12 }}
+                  tickLine={false}
+                  axisLine={{ stroke: '#E0E0E0' }}
+                  width={30}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <defs>
+                  <linearGradient id="colorOrder" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#34D399" stopOpacity={0.8}/>
+                  </linearGradient>
+                </defs>
+                <Bar 
+                  dataKey="uv" 
+                  fill="url(#colorOrder)" 
+                  radius={[4, 4, 0, 0]}
+                  animationDuration={1500}
+                  barSize={isDashboard ? 20 : 40}
+                >
+                  <LabelList 
+                    dataKey="uv" 
+                    position="top" 
+                    fill="#059669" 
+                    fontSize={12} 
+                    fontWeight="bold"
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
       )}
     </>
   );

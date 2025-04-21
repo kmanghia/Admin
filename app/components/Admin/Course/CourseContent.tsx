@@ -1,5 +1,5 @@
 import { styles } from "@/app/styles/style";
-import React, { FC, useState } from "react";
+import React, { FC, useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { AiOutlineDelete, AiOutlinePlusCircle } from "react-icons/ai";
 import { BsLink45Deg, BsPencil, BsPlusCircle } from "react-icons/bs";
@@ -26,7 +26,45 @@ const CourseContent: FC<Props> = ({
     Array(courseContentData.length).fill(false)
   );
   const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
+  const [videoPreviewUrls, setVideoPreviewUrls] = useState<string[]>(Array(courseContentData.length).fill(''));
   const [activeSection, setActiveSection] = useState(1);
+
+  // Khởi tạo videoPreviewUrls từ courseContentData khi chỉnh sửa khóa học
+  useEffect(() => {
+    if (courseContentData && courseContentData.length > 0) {
+      const newVideoPreviewUrls = [...videoPreviewUrls];
+      
+      courseContentData.forEach((item: any, index: number) => {
+        if (item.videoUrl && !newVideoPreviewUrls[index]) {
+          // Nếu videoUrl đã có sẵn nhưng chưa có preview URL
+          if (typeof item.videoUrl === 'string') {
+            let videoUrl;
+            if (item.videoUrl.startsWith('http')) {
+              videoUrl = item.videoUrl;
+            } else {
+              videoUrl = `http://localhost:8000/videos/${item.videoUrl}`;
+            }
+            newVideoPreviewUrls[index] = videoUrl;
+          }
+        }
+      });
+      
+      if (newVideoPreviewUrls.some(url => url !== '')) {
+        setVideoPreviewUrls(newVideoPreviewUrls);
+      }
+    }
+  }, [courseContentData]);
+
+  // Cleanup video preview URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      videoPreviewUrls.forEach(url => {
+        if (url && url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, [videoPreviewUrls]);
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
@@ -74,6 +112,45 @@ const CourseContent: FC<Props> = ({
     setCourseContentData(updatedData);
   };
   
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    if (e.target.files && e.target.files.length > 0) {
+      // Tạo bản sao của mảng selectedVideos
+      const files = [...selectedVideos];
+      
+      // Thêm file mới vào vị trí tương ứng
+      files[index] = e.target.files[0];
+      
+      // Tạo bản sao của courseContentData
+      const updatedData = [...courseContentData];
+      
+      // Cập nhật videoUrl cho phần tử tại vị trí index
+      updatedData[index] = {
+        ...updatedData[index],
+        videoUrl: courseContentData[index]._id,
+      };
+
+      console.log(updatedData[index].videoUrl);
+
+      // Tạo URL xem trước video
+      const newVideoPreviewUrls = [...videoPreviewUrls];
+      if (newVideoPreviewUrls[index] && newVideoPreviewUrls[index].startsWith('blob:')) {
+        URL.revokeObjectURL(newVideoPreviewUrls[index]);
+      }
+      newVideoPreviewUrls[index] = URL.createObjectURL(e.target.files[0]);
+      setVideoPreviewUrls(newVideoPreviewUrls);
+      
+      // Log ra toàn bộ mảng files để kiểm tra
+      console.log('All selected videos:', files);
+      
+      // Cập nhật state
+      setCourseContentData(updatedData);
+      console.log("updated data:"+ updatedData);
+      setSelectedVideos(files);  // Thay vì setVideo
+      console.log(index);
+      console.log(files);
+      setVideo(files);
+    }
+  };
 
   const newContentHandler = (item: any) => {
     if (
@@ -107,6 +184,8 @@ const CourseContent: FC<Props> = ({
       };
 
       setCourseContentData([...courseContentData, newContent]);
+      // Thêm một phần tử trống vào mảng videoPreviewUrls
+      setVideoPreviewUrls([...videoPreviewUrls, '']);
     }
   };
 
@@ -131,6 +210,8 @@ const CourseContent: FC<Props> = ({
         iquizz: [{ question: "", options: ["", "", "", ""], correctAnswer: "" }]
       };
       setCourseContentData([...courseContentData, newContent]);
+      // Thêm một phần tử trống vào mảng videoPreviewUrls
+      setVideoPreviewUrls([...videoPreviewUrls, '']);
     }
   };
 
@@ -154,7 +235,7 @@ const CourseContent: FC<Props> = ({
   };
 
   return (
-    <div className="w-[80%] m-auto mt-24 p-3">
+    <div className="w-[80%] ml-[30px] m-auto mt-24 p-3">
       <form onSubmit={handleSubmit}>
         {courseContentData?.map((item: any, index: number) => {
           const showSectionInput =
@@ -210,6 +291,14 @@ const CourseContent: FC<Props> = ({
                         const updatedData = [...courseContentData];
                         updatedData.splice(index, 1);
                         setCourseContentData(updatedData);
+                        
+                        // Cập nhật lại mảng videoPreviewUrls
+                        const newVideoPreviewUrls = [...videoPreviewUrls];
+                        if (newVideoPreviewUrls[index] && newVideoPreviewUrls[index].startsWith('blob:')) {
+                          URL.revokeObjectURL(newVideoPreviewUrls[index]);
+                        }
+                        newVideoPreviewUrls.splice(index, 1);
+                        setVideoPreviewUrls(newVideoPreviewUrls);
                       }
                     }}
                   />
@@ -253,38 +342,19 @@ const CourseContent: FC<Props> = ({
                       accept="video/*"
                       placeholder="sdder"
                       className={`${styles.input}`}
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files.length > 0) {
-                          // Tạo bản sao của mảng selectedVideos
-                          const files = [...selectedVideos];
-                          
-                          // Thêm file mới vào vị trí tương ứng
-                          files[index] = e.target.files[0];
-                          
-                          // Tạo bản sao của courseContentData
-                          const updatedData = [...courseContentData];
-                          
-                          // Cập nhật videoUrl cho phần tử tại vị trí index
-                          updatedData[index] = {
-                            ...updatedData[index],
-                            videoUrl: courseContentData[index]._id,
-                          };
-
-                          console.log(updatedData[index].videoUrl)
-                    
-                          // Log ra toàn bộ mảng files để kiểm tra
-                          console.log('All selected videos:', files);
-                          
-                          // Cập nhật state
-                          setCourseContentData(updatedData);
-                          console.log("updated data:"+ updatedData)
-                          setSelectedVideos(files);  // Thay vì setVideo
-                          console.log(index)
-                          console.log(files)
-                          setVideo(files)
-                        }  
-                      }}
+                      onChange={(e) => handleVideoChange(e, index)}
                     />
+                    {videoPreviewUrls[index] && (
+                      <div className="mt-2">
+                        <video 
+                          controls 
+                          className="w-full h-auto mt-2" 
+                          src={videoPreviewUrls[index]}
+                        >
+                          Trình duyệt của bạn không hỗ trợ thẻ video.
+                        </video>
+                      </div>
+                    )}
                   </div>
                   <div className="mb-3">
                     <label className={styles.label}>Độ dài video (phút)</label>

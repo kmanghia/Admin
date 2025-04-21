@@ -25,13 +25,44 @@ const DashboardHeader: FC<Props> = ({ open, setOpen }) => {
   const [notifications, setNotifications] = useState<any>([]);
   const [audio] = useState<any>(
     typeof window !== "undefined" &&
-      new Audio(
-        ""
-      )
+      new Audio("/simple-notification-152054.mp3")
   );
 
   const playNotificationSound = () => {
-    audio.play();
+    if (audio) {
+      try {
+        // Create a new Audio instance each time to ensure fresh playback
+        const sound = new Audio("/simple-notification-152054.mp3");
+        sound.volume = 1.0; // Ensure volume is at maximum
+        sound.play()
+          .then(() => {
+            console.log("Notification sound played successfully");
+          })
+          .catch((error: any) => {
+            console.error("Error playing notification sound:", error);
+          });
+      } catch (error) {
+        console.error("Error creating audio:", error);
+      }
+    }
+  };
+
+  // Thêm hàm test âm thanh
+  const testNotificationSound = () => {
+    try {
+      // Create a new Audio instance for test
+      const sound = new Audio("/simple-notification-152054.mp3");
+      sound.volume = 1.0; // Ensure volume is at maximum
+      sound.play()
+        .then(() => {
+          console.log("Test sound played successfully");
+        })
+        .catch((error: any) => {
+          console.error("Error playing test sound:", error);
+        });
+    } catch (error) {
+      console.error("Error creating audio:", error);
+    }
   };
 
   useEffect(() => {
@@ -43,15 +74,34 @@ const DashboardHeader: FC<Props> = ({ open, setOpen }) => {
     if (isSuccess) {
       refetch();
     }
-    audio.load();
-  }, [data, isSuccess,audio]);
+  }, [data, isSuccess]);
 
   useEffect(() => {
-    //lắng nghe sự kiện từ server thông qua socketio
-    socketId.on("newNotification", (data) => {
+    console.log("Setting up socket listeners");
+    
+    // Lắng nghe sự kiện newNotification
+    socketId.on("newNotification", (notification: any) => {
+      console.log("Received new notification:", notification);
+      
+      // Thêm notification mới vào state
+      setNotifications((prev: any) => [notification, ...prev]);
+      
+      // Tải lại danh sách notifications
       refetch();
+    });
+
+    // Lắng nghe sự kiện playNotificationSound
+    socketId.on("playNotificationSound", () => {
+      console.log("Received play sound event");
       playNotificationSound();
     });
+
+    // Cleanup khi component unmount
+    return () => {
+      console.log("Cleaning up socket listeners");
+      socketId.off("newNotification");
+      socketId.off("playNotificationSound");
+    };
   }, []);
 
   const handleNotificationStatusChange = async (id: string) => {
@@ -61,6 +111,13 @@ const DashboardHeader: FC<Props> = ({ open, setOpen }) => {
   return (
     <div className="w-full flex items-center justify-end p-6 fixed top-5 right-0 z-[9999999]">
       <ThemeSwitcher />
+      {/* Thêm nút test âm thanh */}
+      <button
+        onClick={testNotificationSound}
+        className="mr-4 px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+      >
+        Test Sound
+      </button>
       <div
         className="relative cursor-pointer m-2"
         onClick={() => setOpen(!open)}

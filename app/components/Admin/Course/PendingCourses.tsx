@@ -162,7 +162,7 @@ const PendingCourses = (props: Props) => {
   }
 
   return (
-    <div className="mt-[30px]">
+    <div className="mt-[30px] ml-[40px]">
       {isLoading ? (
         <Loader />
       ) : (
