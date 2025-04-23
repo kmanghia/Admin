@@ -7,11 +7,13 @@ import { MdOutlineRateReview } from "react-icons/md";
 import { TbReportAnalytics } from "react-icons/tb";
 import { IoHomeOutline } from "react-icons/io5";
 import { IoMdLogOut } from "react-icons/io";
+import { FaRegComments } from "react-icons/fa";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import Image from "next/image";
 import { useSelector } from "react-redux";
 import Cookies from "js-cookie";
+import { useGetUnreadCountQuery } from "@/redux/features/chat/chatApi";
 
 type Props = {
   active: number;
@@ -22,6 +24,9 @@ const MentorSidebar: FC<Props> = ({ active, setActive }) => {
   const { user } = useSelector((state: any) => state.auth);
   const [mounted, setMounted] = useState(false);
   const { theme } = useTheme();
+  const { data: unreadData } = useGetUnreadCountQuery({}, {
+    pollingInterval: 30000, // Poll every 30 seconds
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -93,6 +98,13 @@ const MentorSidebar: FC<Props> = ({ active, setActive }) => {
       path: "/mentor/create-course",
       id: 6,
     },
+    {
+      icon: <FaRegComments className="text-xl" />,
+      title: "Tin nhắn",
+      path: "/mentor/chats",
+      id: 7,
+      badge: unreadData?.unreadCount || 0,
+    },
   ];
 
   return (
@@ -148,6 +160,13 @@ const MentorSidebar: FC<Props> = ({ active, setActive }) => {
                 >
                   {item.title}
                 </h5>
+                {item.badge && item.badge > 0 && (
+                  <div className="ml-auto">
+                    <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                      {item.badge}
+                    </span>
+                  </div>
+                )}
               </div>
             </Link>
           ))}
