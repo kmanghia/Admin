@@ -203,11 +203,26 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
     courseContentData.forEach((content, contentIndex) => {
       content.iquizz.forEach((quizz, quizzIndex) => {
         if (quizz.questionImage?.file) {
-          // Đảm bảo đúng tên trường là 'images' và gán trực tiếp file
-          console.log(`[DEBUG-CLIENT-EDIT] Adding quiz image for section=${contentIndex}, quiz=${quizzIndex}, file=${quizz.questionImage.file.name}`);
+          // Tạo uniqueId để đảm bảo mapping chính xác
+          const uniqueId = `${contentIndex}_${quizzIndex}`;
+          console.log(`[DEBUG-CLIENT-EDIT] Adding quiz image for section=${contentIndex}, quiz=${quizzIndex}, file=${quizz.questionImage.file.name}, uniqueId=${uniqueId}`);
           
-          // Thử append với tên gốc
-          formData.append('quiz_images', quizz.questionImage.file);
+          // Đổi tên file để chứa uniqueId ở đầu (trước dấu __) để dễ dàng trích xuất
+          const originalName = quizz.questionImage.file.name;
+          const fileExtension = originalName.split('.').pop();
+          // Format: uniqueId__originalName.ext
+          const newFilename = `${uniqueId}__${originalName}`;
+          
+          // Cần sử dụng tên trường chuẩn 'quiz_images' mà server mong đợi
+          const renamedFile = new File(
+            [quizz.questionImage.file], 
+            newFilename, 
+            { type: quizz.questionImage.file.type }
+          );
+          
+          formData.append('quiz_images', renamedFile);
+          console.log(`[DEBUG-CLIENT-EDIT] Appended with field name: quiz_images, filename: ${newFilename}`);
+          
           quizImageCount++;
         }
       });
