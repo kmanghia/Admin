@@ -187,21 +187,40 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
     if (!message.trim() || !socketRef.current || !userId) return;
     
     try {
+      const messageText = message.trim();
+      
+      // Create a temporary local message object for immediate display
+      const tempMessage = {
+        _id: `temp_${Date.now()}`,
+        content: messageText,
+        sender: { _id: userId, name: 'You' },
+        readBy: [userId],
+        createdAt: new Date().toISOString()
+      };
+      
+      // Update local chat state immediately
+      setChat(prevChat => {
+        if (!prevChat) return null;
+        return {
+          ...prevChat,
+          messages: [...prevChat.messages, tempMessage]
+        };
+      });
+      
+      // Then send to server
       socketRef.current.emit('sendMessage', {
         chatId,
-        message: message.trim(),
+        message: messageText,
         senderId: userId
       });
       
       setMessage('');
       setIsTyping(false);
       
-      // Clear typing timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
       
-      // Send typing stopped event
       socketRef.current.emit('typing', { 
         chatId, 
         userId, 
@@ -240,10 +259,17 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
   const getMessageSenderName = (msg: Message): string => {
     if (typeof msg.sender === 'string') {
       // If sender is just an ID, check if it's the current user
-      return msg.sender === userId ? 'You' : 'User';
+      if (msg.sender === userId) return 'You';
+      
+      // Try to find the sender in participants
+      const participant = chat?.participants.find(p => p._id === msg.sender);
+      if (participant?.name) return participant.name;
+      
+      return 'User';
     } else {
       // If sender is an object
-      return msg.sender._id === userId ? 'You' : (msg.sender.name || 'User');
+      if (msg.sender._id === userId) return 'You';
+      return `${msg.sender.name} giảng viên` || 'User';
     }
   };
 
@@ -251,6 +277,10 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
   const getMessageSenderAvatar = (msg: Message): string => {
     if (typeof msg.sender === 'string') {
       // If sender is just an ID, use default avatar
+      // Try to find the sender in participants
+      const participant = chat?.participants.find(p => p._id === msg.sender);
+      if (participant?.avatar?.url) return participant.avatar.url;
+      
       return 'default-avatar.png';
     } else {
       // If sender is an object with avatar
@@ -383,7 +413,7 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
                     <div className="flex-shrink-0 mr-2">
                       <div className="relative w-8 h-8 rounded-full overflow-hidden">
                         <Image
-                          src={`http://localhost:8000/images/${getChatAvatar()}`}
+                          src={`http://localhost:8000/images/${getMessageSenderAvatar(msg)}`}
                           alt={getMessageSenderName(msg)}
                           fill
                           className="object-cover"
@@ -398,7 +428,7 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
                   <div className={`max-w-[75%]`}>
                     {!isCurrentUser && (
                       <div className="text-xs text-gray-500 dark:text-gray-400 ml-1 mb-1">
-                        {getChatTitle()}
+                        {getMessageSenderName(msg)}
                       </div>
                     )}
                     
