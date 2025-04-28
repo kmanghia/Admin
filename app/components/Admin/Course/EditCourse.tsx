@@ -12,6 +12,19 @@ import {
 import { toast } from "react-hot-toast";
 import { redirect } from "next/navigation";
 
+// Định nghĩa interface cho QuizQuestion
+interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  questionImage?: {
+    url: string;
+    file?: File;
+    preview?: string;
+    uniqueId?: string;
+  };
+}
+
 type Props = {
   id: string;
   userRole?: string;
@@ -95,9 +108,13 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
           url: "",
         },
       ],
-      iquizz:[{ question: "", options: ["", "", "", ""], correctAnswer: "" }],
+      iquizz:[{ 
+        question: "", 
+        options: ["", "", "", ""], 
+        correctAnswer: "",
+        questionImage: undefined
+      } as QuizQuestion],
       suggestion: "",
-
     },
   ]);
 
@@ -129,6 +146,9 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
           question: quizz.question,
           options: quizz.options,
           correctAnswer: quizz.correctAnswer,
+          questionImage: quizz.questionImage ? {
+            url: quizz.questionImage.url
+          } : undefined
         })),
         suggestion: courseContent.suggestion,
       })
@@ -157,17 +177,61 @@ const EditCourse: FC<Props> = ({ id, userRole = "admin" }) => {
     
     const formData = new FormData();
     formData.append('imageedit', image as any);
-    formData.append('demoedit', demo as any)
+    formData.append('demoedit', demo as any);
     if (video) {  
       for (let i = 0; i < video.length; i++) {       
          formData.append('videos', video[i] as any);   
-           }  
+      }  
     } 
+    
+    console.log('[DEBUG-CLIENT-EDIT] Bắt đầu thu thập hình ảnh câu hỏi');
+    // Thêm các file hình ảnh câu hỏi vào FormData
+    let quizImageCount = 0;
+    
+    // Check if we have any quiz images
+    let hasQuizImages = false;
+    courseContentData.forEach(content => {
+      content.iquizz.forEach(quizz => {
+        if (quizz.questionImage?.file) {
+          hasQuizImages = true;
+        }
+      });
+    });
+    
+    console.log(`[DEBUG-CLIENT-EDIT] Has quiz images: ${hasQuizImages}`);
+    
+    courseContentData.forEach((content, contentIndex) => {
+      content.iquizz.forEach((quizz, quizzIndex) => {
+        if (quizz.questionImage?.file) {
+          // Đảm bảo đúng tên trường là 'images' và gán trực tiếp file
+          console.log(`[DEBUG-CLIENT-EDIT] Adding quiz image for section=${contentIndex}, quiz=${quizzIndex}, file=${quizz.questionImage.file.name}`);
+          
+          // Thử append với tên gốc
+          formData.append('quiz_images', quizz.questionImage.file);
+          quizImageCount++;
+        }
+      });
+    });
+    
+    console.log(`[DEBUG-CLIENT-EDIT] Đã thêm ${quizImageCount} hình ảnh câu hỏi vào FormData`);
+    
+    // Double-check FormData contains images
+    let hasImagesField = false;
+    const formDataKeys: string[] = [];
+    formData.forEach((value, key) => {
+      formDataKeys.push(key);
+      console.log(`[DEBUG-CLIENT-EDIT] FormData key: ${key}, type: ${typeof value}, value: ${value instanceof File ? value.name : value}`);
+      if (key === 'quiz_images') hasImagesField = true;
+    });
+    
+    console.log(`[DEBUG-CLIENT-EDIT] Has 'quiz_images' field: ${hasImagesField}`);
+    console.log(`[DEBUG-CLIENT-EDIT] FormData keys: ${formDataKeys.join(', ')}`);
+    
     // const data = courseData;
     const data = JSON.stringify(courseData);
     formData.append('courseData', data); // Thêm courseData vào FormData
-    console.log(formData);
-    console.log(data);
+    
+    console.log('[DEBUG-CLIENT-EDIT] Sending course data to server...');
     await editCourse({ id: editCourseData?._id, data: formData });
   };
 

@@ -52,7 +52,7 @@ const AllMentors = (props: Props) => {
   };
 
   const columns = [
-    { field: "id", headerName: "ID", flex: 0.3 },
+    
     {
       field: "name",
       headerName: "Tên mentor",

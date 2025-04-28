@@ -26,7 +26,7 @@ const AllCourses = (props: Props) => {
   );
   const [deleteCourse, { isSuccess, error }] = useDeleteCourseMutation({});
   const columns = [
-    { field: "id", headerName: "ID", flex: 0.5 },
+    
     { field: "title", headerName: "Khóa học", flex: 1 },
     { field: "ratings", headerName: "Đánh giá", flex: 0.5 },
     { field: "purchased", headerName: "Mua", flex: 0.5 },

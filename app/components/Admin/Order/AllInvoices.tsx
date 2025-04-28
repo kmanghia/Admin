@@ -43,7 +43,6 @@ const AllInvoices = ({ isDashboard }: Props) => {
   }, [data, usersData, coursesData]);
 
   const columns: any = [
-    { field: "id", headerName: "ID", flex: 0.3 },
     { field: "userName", headerName: "Tên", flex: isDashboard ? 0.6 : 0.5 },
     ...(isDashboard
       ? []

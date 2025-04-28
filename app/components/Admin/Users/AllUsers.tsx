@@ -60,7 +60,7 @@ const AllCourses: FC<Props> = ({ isTeam }) => {
   }, [updateError, isSuccess, deleteSuccess, deleteError]);
 
   const columns = [
-    { field: "id", headerName: "ID", flex: 0.3 },
+   
     { field: "name", headerName: "Tên", flex: 0.5 },
     { field: "email", headerName: "Email", flex: 0.5 },
     { field: "role", headerName: "Vai trò", flex: 0.5 },

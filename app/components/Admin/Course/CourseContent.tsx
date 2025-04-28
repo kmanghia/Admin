@@ -1,5 +1,5 @@
 import { styles } from "@/app/styles/style";
-import React, { FC, useState, useEffect } from "react";
+import React, { FC, useState, useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
 import { AiOutlineDelete, AiOutlinePlusCircle } from "react-icons/ai";
 import { BsLink45Deg, BsPencil, BsPlusCircle } from "react-icons/bs";
@@ -55,16 +55,87 @@ const CourseContent: FC<Props> = ({
     }
   }, [courseContentData]);
 
+  // Khởi tạo preview cho hình ảnh câu hỏi khi chỉnh sửa khóa học
+  const initialImagePreviewDone = useRef(false);
+  useEffect(() => {
+    // Only run this once on first load
+    if (initialImagePreviewDone.current) return;
+    
+    if (courseContentData && courseContentData.length > 0) {
+      let hasUpdates = false;
+      const updatedContentData = courseContentData.map((content: { iquizz: any[]; }, contentIndex: any) => {
+        // Kiểm tra nếu có iquizz và là mảng
+        if (content.iquizz && Array.isArray(content.iquizz)) {
+          // Tạo mảng mới cho các câu hỏi quiz
+          const updatedIquizz = content.iquizz.map((quizz, quizzIndex) => {
+            // Kiểm tra nếu có questionImage nhưng chưa có preview
+            if (quizz.questionImage && quizz.questionImage.url && !quizz.questionImage.preview) {
+              hasUpdates = true;
+              
+              // Tạo URL từ đường dẫn ảnh
+              let imageUrl;
+              if (quizz.questionImage.url.startsWith('http')) {
+                imageUrl = quizz.questionImage.url;
+              } else {
+                imageUrl = `http://localhost:8000/images/${quizz.questionImage.url}`;
+              }
+              
+              console.log(`[DEBUG-PREVIEW] Added preview for question image: section=${contentIndex}, quiz=${quizzIndex}, url=${imageUrl}`);
+              
+              // Trả về câu hỏi quiz với thông tin ảnh mới
+              return {
+                ...quizz,
+                questionImage: {
+                  ...quizz.questionImage,
+                  preview: imageUrl
+                }
+              };
+            }
+            // Trả về câu hỏi quiz không đổi
+            return quizz;
+          });
+          
+          // Trả về nội dung đã cập nhật
+          return {
+            ...content,
+            iquizz: updatedIquizz
+          };
+        }
+        // Trả về nội dung không đổi
+        return content;
+      });
+      
+      if (hasUpdates) {
+        initialImagePreviewDone.current = true;
+        setCourseContentData(updatedContentData);
+      } else {
+        initialImagePreviewDone.current = true;
+      }
+    }
+  }, [courseContentData]);
+
   // Cleanup video preview URLs when component unmounts
   useEffect(() => {
     return () => {
+      // Cleanup video preview URLs
       videoPreviewUrls.forEach(url => {
         if (url && url.startsWith('blob:')) {
           URL.revokeObjectURL(url);
         }
       });
+      
+      // Cleanup question image preview URLs
+      courseContentData.forEach((content: { iquizz: any[]; }) => {
+        if (content.iquizz && Array.isArray(content.iquizz)) {
+          content.iquizz.forEach((quizz: { questionImage: { preview: string; }; }) => {
+            if (quizz.questionImage?.preview && quizz.questionImage.preview.startsWith('blob:')) {
+              URL.revokeObjectURL(quizz.questionImage.preview);
+            }
+          });
+        }
+      });
     };
-  }, [videoPreviewUrls]);
+  }, [videoPreviewUrls, courseContentData]);
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
@@ -107,7 +178,12 @@ const CourseContent: FC<Props> = ({
     const updatedData = [...courseContentData];
     updatedData[index] = {
       ...updatedData[index],
-      iquizz: [...updatedData[index].iquizz, { question: "", options: ["", "", "", ""], correctAnswer: "" }],
+      iquizz: [...updatedData[index].iquizz, { 
+        question: "", 
+        options: ["", "", "", ""], 
+        correctAnswer: "",
+        questionImage: undefined 
+      }],
     };
     setCourseContentData(updatedData);
   };
@@ -180,7 +256,7 @@ const CourseContent: FC<Props> = ({
         videoSection: newVideoSection,
         videoLength: "",
         links: [{ title: "", url: "" }],
-        iquizz: [{ question: "", options: ["", "", "", ""], correctAnswer: "" }]
+        iquizz: [{ question: "", options: ["", "", "", ""], correctAnswer: "", questionImage: undefined }]
       };
 
       setCourseContentData([...courseContentData, newContent]);
@@ -207,7 +283,7 @@ const CourseContent: FC<Props> = ({
         videoLength: "",
         videoSection: `Phần không có tiêu đề ${activeSection}`,
         links: [{ title: "", url: "" }],
-        iquizz: [{ question: "", options: ["", "", "", ""], correctAnswer: "" }]
+        iquizz: [{ question: "", options: ["", "", "", ""], correctAnswer: "", questionImage: undefined }]
       };
       setCourseContentData([...courseContentData, newContent]);
       // Thêm một phần tử trống vào mảng videoPreviewUrls
@@ -488,6 +564,79 @@ const CourseContent: FC<Props> = ({
         setCourseContentData(updatedData);
       }}
     />
+    
+    {/* Question Image Upload */}
+    <div className="mt-2 mb-4">
+      <label className={`${styles.label} block mb-2`}>Hình ảnh cho câu hỏi (không bắt buộc)</label>
+      <input
+        type="file"
+        accept="image/*"
+        className={`${styles.input}`}
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            console.log(`[DEBUG-UPLOAD] Đã chọn file: ${file.name}, size: ${file.size}, type: ${file.type}`);
+            
+            // Tạo URL tạm thời để hiển thị ảnh preview
+            const imageUrl = URL.createObjectURL(file);
+            console.log(`[DEBUG-UPLOAD] Đã tạo URL preview: ${imageUrl}`);
+            
+            // Tạo bản sao của dữ liệu (không sử dụng JSON.parse/stringify cho File object)
+            const updatedData = courseContentData.map((content: { iquizz: any[]; }, contentIndex: number) => {
+              if (contentIndex === index) {
+                // Sao chép nội dung hiện tại
+                return {
+                  ...content,
+                  iquizz: content.iquizz.map((quiz: any, qIndex: number) => {
+                    if (qIndex === quizzIndex) {
+                      // Cập nhật quiz hiện tại với hình ảnh mới
+                      return {
+                        ...quiz,
+                        questionImage: {
+                          url: file.name,
+                          file: file,
+                          preview: imageUrl,
+                          contentIndex: index,
+                          quizzIndex: quizzIndex
+                        }
+                      };
+                    }
+                    return quiz;
+                  })
+                };
+              }
+              return content;
+            });
+            
+            console.log(`[DEBUG-UPLOAD] Đã cập nhật state với file hình ảnh cho câu hỏi: section=${index}, quiz=${quizzIndex}`);
+            
+            // Kiểm tra lại đối tượng File
+            const updatedQuizz = updatedData[index].iquizz[quizzIndex];
+            if (updatedQuizz.questionImage?.file) {
+              console.log(`[DEBUG-UPLOAD] File object after state update:`, {
+                name: updatedQuizz.questionImage.file.name,
+                size: updatedQuizz.questionImage.file.size,
+                type: updatedQuizz.questionImage.file.type
+              });
+            }
+            
+            setCourseContentData(updatedData);
+          }
+        }}
+      />
+      
+      {/* Image Preview */}
+      {quizz.questionImage?.preview && (
+        <div className="mt-2">
+          <img 
+            src={quizz.questionImage.preview} 
+            alt="Question Preview" 
+            className="max-w-[200px] h-auto rounded-md border" 
+          />
+        </div>
+      )}
+    </div>
+    
     {quizz.options.map((option: string, optionIndex: number) => (
       <input
         key={optionIndex}

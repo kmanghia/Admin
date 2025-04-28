@@ -57,7 +57,7 @@ const MentorCourses = (props: Props) => {
   };
 
   const columns = [
-    { field: "id", headerName: "ID", flex: 0.3 },
+    
     {
       field: "title",
       headerName: "Tên khóa học",
