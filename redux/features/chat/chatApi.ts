@@ -54,6 +54,18 @@ export const chatApi = apiSlice.injectEndpoints({
       }),
       providesTags: ["UnreadCount"],
     }),
+
+    // Upload attachments for chat
+    uploadAttachments: builder.mutation({
+      query: (formData) => ({
+        url: "chat/upload-attachments",
+        method: "POST",
+        body: formData,
+        credentials: "include" as const,
+        // Don't set Content-Type header here - RTK Query will set it correctly with boundary for FormData
+        formData: true,
+      }),
+    }),
   }),
 });
 
@@ -63,4 +75,5 @@ export const {
   useCreateOrGetPrivateChatMutation,
   useMarkMessageAsReadMutation,
   useGetUnreadCountQuery,
+  useUploadAttachmentsMutation,
 } = chatApi; 

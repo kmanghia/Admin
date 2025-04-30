@@ -66,7 +66,7 @@ const MentorChatList: FC = () => {
       const otherParticipant = chat.participants.find(p => p._id !== mentorId);
       return otherParticipant?.avatar?.url || 'default-avatar.png';
     } else {
-      return chat.courseId?.thumbnail?.url || 'default-course.png';
+      return chat.courseId?.thumbnail?.url || (chat.courseId?.thumbnail as unknown as string) || 'default-course.png';
     }
   };
 

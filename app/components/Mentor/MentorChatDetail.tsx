@@ -2,13 +2,32 @@
 import React, { FC, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChatDetails, Message } from "@/types/chat";
-import { useGetChatByIdQuery, useMarkMessageAsReadMutation } from "@/redux/features/chat/chatApi";
+import { useGetChatByIdQuery, useMarkMessageAsReadMutation, useUploadAttachmentsMutation } from "@/redux/features/chat/chatApi";
 import Image from "next/image";
 import { IoArrowBackOutline } from "react-icons/io5";
 import { IoSend } from "react-icons/io5";
 import { format } from "timeago.js";
-import { URL_SERVER } from "@/app/utils/url";
+import { URL_SERVER, URL } from "@/app/utils/url";
 import socketIO from "socket.io-client";
+import { BsImage, BsPaperclip } from "react-icons/bs";
+import { AiOutlineClose } from "react-icons/ai";
+import { FiFile, FiFileText, FiVideo, FiMusic } from "react-icons/fi";
+import Cookies from "js-cookie";
+
+// Add attachment interface
+interface Attachment {
+  type: string;
+  url: string;
+  filename: string;
+  mimeType: string;
+  size?: number;
+  thumbnailUrl?: string;
+}
+
+// Update Message interface to include attachments
+interface MessageWithAttachments extends Message {
+  attachments?: Attachment[];
+}
 
 // Socket connection setup
 const ENDPOINT = process.env.NEXT_PUBLIC_SOCKET_SERVER_URI || "";
@@ -29,8 +48,18 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
   const socketRef = useRef<any>(socketId);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Add attachments state
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  
+  // File input ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  
   const { data, isLoading, refetch } = useGetChatByIdQuery(chatId);
   const [markMessageAsRead] = useMarkMessageAsReadMutation();
+  const [uploadAttachments, { isLoading: isUploadLoading }] = useUploadAttachmentsMutation();
 
   // Initial setup and getting user ID
   useEffect(() => {
@@ -91,6 +120,11 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
     }
   }, [chat?.messages]);
 
+  // Update isUploading state to use RTK Query's isLoading
+  useEffect(() => {
+    setIsUploading(isUploadLoading);
+  }, [isUploadLoading]);
+
   // Socket initialization
   const initializeSocket = (user: string) => {
     // Join the chat room
@@ -98,8 +132,6 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
     
     // Listen for new messages
     socketRef.current.on('newMessage', (data: any) => {
-      console.log('New message received:', data);
-      
       if (data.chatId === chatId) {
         // Update chat with new message
         setChat(prevChat => {
@@ -182,9 +214,72 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
     }
   };
 
-  // Send message
+  // File upload handlers
+  const handleImageClick = () => {
+    if (imageInputRef.current) {
+      imageInputRef.current.click();
+    }
+  };
+
+  const handleFileClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Update file upload handler to use RTK Query mutation
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'document') => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // Check if attachment limit (5) is reached
+    if (attachments.length + files.length > 5) {
+      alert("Bạn chỉ có thể đính kèm tối đa 5 tệp cho mỗi tin nhắn");
+      return;
+    }
+    
+    try {
+      const fileArray = Array.from(files);
+      
+      // Prepare FormData
+      const formData = new FormData();
+      fileArray.forEach(file => {
+        formData.append('files', file);
+      });
+
+      // Use RTK Query mutation instead of axios
+      const response = await uploadAttachments(formData).unwrap();
+      
+      if (response.success && response.attachments) {
+        setAttachments(prev => [...prev, ...response.attachments]);
+      } else {
+        alert("Không thể tải lên tệp đính kèm");
+      }
+    } catch (error: any) {
+      console.error("Lỗi khi tải lên tệp:", error);
+      // Show error message
+      if (error.status) {
+        alert(`Lỗi (${error.status}): ${error.data?.message || "Có lỗi xảy ra khi tải lên tệp"}`);
+      } else {
+        alert(`Lỗi: ${error.message || "Có lỗi xảy ra khi tải lên tệp"}`);
+      }
+    } finally {
+      // Clear the input value so the same file can be selected again
+      if (type === 'image' && imageInputRef.current) {
+        imageInputRef.current.value = '';
+      } else if (type === 'document' && fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Send message with attachments
   const sendMessage = () => {
-    if (!message.trim() || !socketRef.current || !userId) return;
+    if ((!message.trim() && attachments.length === 0) || !socketRef.current || !userId) return;
     
     try {
       const messageText = message.trim();
@@ -195,7 +290,8 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
         content: messageText,
         sender: { _id: userId, name: 'You' },
         readBy: [userId],
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        attachments: attachments.length > 0 ? [...attachments] : undefined
       };
       
       // Update local chat state immediately
@@ -211,10 +307,12 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
       socketRef.current.emit('sendMessage', {
         chatId,
         message: messageText,
-        senderId: userId
+        senderId: userId,
+        attachments: attachments.length > 0 ? attachments : undefined
       });
       
       setMessage('');
+      setAttachments([]);
       setIsTyping(false);
       
       if (typingTimeoutRef.current) {
@@ -251,7 +349,7 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
       const otherParticipant = chat.participants.find(p => p._id !== userId);
       return otherParticipant?.avatar?.url || 'default-avatar.png';
     } else {
-      return chat.courseId?.thumbnail?.url || 'default-course.png';
+      return chat.courseId?.thumbnail?.url ||  (chat.courseId?.thumbnail as unknown as string) || 'default-course.png';
     }
   };
 
@@ -317,6 +415,128 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
     }
   };
 
+  // Handle image preview
+  const openImagePreview = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+  };
+
+  const closeImagePreview = () => {
+    setSelectedImage(null);
+  };
+
+  // Render attachment thumbnails in message
+  const renderAttachments = (attachments?: Attachment[]) => {
+    if (!attachments || attachments.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        {attachments.map((attachment, index) => (
+          <div 
+            key={index} 
+            className="relative bg-white dark:bg-gray-700 rounded-md overflow-hidden"
+            style={{ width: attachment.type === 'image' ? '150px' : '120px', height: attachment.type === 'image' ? '120px' : '80px' }}
+          >
+            {attachment.type === 'image' ? (
+              <div 
+                className="cursor-pointer w-full h-full" 
+                onClick={() => openImagePreview(`${URL}/images/${attachment.url}`)}
+              >
+                <Image 
+                  src={`${URL}/images/${attachment.url}`}
+                  alt={attachment.filename}
+                  fill
+                  className="object-cover"
+                  onError={(e: any) => {
+                    e.target.src = '/placeholder-image.png';
+                  }}
+                />
+              </div>
+            ) : attachment.type === 'video' ? (
+              <a 
+                href={`${URL}/${attachment.type}s/${attachment.url}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex flex-col items-center justify-center h-full p-2 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              >
+                <FiVideo className="text-red-500" size={24} />
+                <p className="text-xs mt-1 text-center truncate w-full">{attachment.filename}</p>
+              </a>
+            ) : attachment.type === 'audio' ? (
+              <a 
+                href={`${URL}/${attachment.type}s/${attachment.url}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex flex-col items-center justify-center h-full p-2 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              >
+                <FiMusic className="text-purple-500" size={24} />
+                <p className="text-xs mt-1 text-center truncate w-full">{attachment.filename}</p>
+              </a>
+            ) : (
+              <a 
+                href={`${URL}/${attachment.type}s/${attachment.url}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex flex-col items-center justify-center h-full p-2 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              >
+                <FiFileText className="text-blue-500" size={24} />
+                <p className="text-xs mt-1 text-center truncate w-full">{attachment.filename}</p>
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Render attachment previews in input area
+  const renderAttachmentPreviews = () => {
+    if (attachments.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-2 p-2 border-t border-gray-200 dark:border-gray-700">
+        {attachments.map((attachment, index) => (
+          <div 
+            key={index} 
+            className="relative bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden"
+            style={{ width: '80px', height: '80px' }}
+          >
+            {attachment.type === 'image' ? (
+              <div className="w-full h-full">
+                <Image 
+                  src={`${URL}/images/${attachment.url}`}
+                  alt={attachment.filename}
+                  fill
+                  className="object-cover"
+                  onError={(e: any) => {
+                    e.target.src = '/placeholder-image.png';
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full p-2">
+                {attachment.type === 'video' ? (
+                  <FiVideo size={20} className="text-red-500" />
+                ) : attachment.type === 'audio' ? (
+                  <FiMusic size={20} className="text-purple-500" />
+                ) : (
+                  <FiFile size={20} className="text-blue-500" />
+                )}
+                <p className="text-xs mt-1 text-center truncate w-full">{attachment.filename}</p>
+              </div>
+            )}
+
+            <button 
+              onClick={() => removeAttachment(index)}
+              className="absolute top-0 right-0 bg-white dark:bg-gray-700 rounded-full p-1 shadow-md"
+            >
+              <AiOutlineClose size={14} className="text-red-500" />
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -359,14 +579,14 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
         
         <div className="relative w-10 h-10 rounded-full overflow-hidden mr-3">
           <Image 
-            src={`http://localhost:8000/images/${getChatAvatar()}`}
+            src={`${URL}/images/${getChatAvatar()}`}
             alt={getChatTitle()}
             fill
             className="object-cover"
             onError={(e: any) => {
               e.target.src = chat.chatType === 'private' 
-                ? 'default-avatar.png' 
-                : 'default-course.png';
+                ? '/default-avatar.png' 
+                : '/default-course.png';
             }}
           />
         </div>
@@ -413,12 +633,12 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
                     <div className="flex-shrink-0 mr-2">
                       <div className="relative w-8 h-8 rounded-full overflow-hidden">
                         <Image
-                          src={`http://localhost:8000/images/${getMessageSenderAvatar(msg)}`}
+                          src={`${URL}/images/${getMessageSenderAvatar(msg)}`}
                           alt={getMessageSenderName(msg)}
                           fill
                           className="object-cover"
                           onError={(e: any) => {
-                            e.target.src = 'default-avatar.png';
+                            e.target.src = '/default-avatar.png';
                           }}
                         />
                       </div>
@@ -437,7 +657,13 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
                         ? 'bg-blue-500 text-white rounded-br-none' 
                         : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-white rounded-bl-none shadow-sm'
                     }`}>
-                      <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                      {msg.content && (
+                        <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                      )}
+                      
+                      {/* Render attachments if present */}
+                      {renderAttachments((msg as MessageWithAttachments).attachments)}
+                      
                       <div className={`text-xs mt-1 ${
                         isCurrentUser 
                           ? 'text-blue-100' 
@@ -463,9 +689,50 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
         {typingIndicator}
       </div>
       
+      {/* Attachment previews */}
+      {renderAttachmentPreviews()}
+      
       {/* Message input */}
       <div className="p-3 border-t border-gray-200 dark:border-gray-800">
         <div className="flex items-center">
+          {/* Hidden file inputs */}
+          <input
+            type="file"
+            ref={imageInputRef}
+            onChange={(e) => handleFileUpload(e, 'image')}
+            accept="image/*"
+            className="hidden"
+            multiple
+          />
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={(e) => handleFileUpload(e, 'document')}
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,audio/*,video/*"
+            className="hidden"
+            multiple
+          />
+          
+          {/* Attachment buttons */}
+          <div className="flex mr-2">
+            <button
+              onClick={handleImageClick}
+              disabled={isUploading}
+              className="p-2 text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors mr-1"
+              title="Đính kèm hình ảnh"
+            >
+              <BsImage size={20} />
+            </button>
+            <button
+              onClick={handleFileClick}
+              disabled={isUploading}
+              className="p-2 text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+              title="Đính kèm tệp"
+            >
+              <BsPaperclip size={20} />
+            </button>
+          </div>
+          
           <input
             type="text"
             value={message}
@@ -473,20 +740,48 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
             onKeyPress={handleKeyPress}
             placeholder="Nhập tin nhắn..."
             className="flex-1 p-3 rounded-l-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            disabled={isUploading}
           />
           <button
             onClick={sendMessage}
-            disabled={!message.trim()}
+            disabled={(!message.trim() && attachments.length === 0) || isUploading}
             className={`p-3 rounded-r-lg ${
-              message.trim()
-                ? 'bg-blue-500 hover:bg-blue-600' 
-                : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'
-            } text-white transition-colors`}
+              (!message.trim() && attachments.length === 0) || isUploading
+                ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed' 
+                : 'bg-blue-500 hover:bg-blue-600'
+            } text-white transition-colors flex items-center justify-center`}
           >
-            <IoSend size={20} />
+            {isUploading ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              <IoSend size={20} />
+            )}
           </button>
         </div>
       </div>
+      
+      {/* Image preview modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center"
+          onClick={closeImagePreview}
+        >
+          <div className="relative max-w-4xl max-h-screen p-2">
+            <button 
+              className="absolute top-3 right-3 bg-black bg-opacity-50 text-white rounded-full p-2 hover:bg-opacity-70 transition-colors"
+              onClick={closeImagePreview}
+            >
+              <AiOutlineClose size={24} />
+            </button>
+            <img 
+              src={selectedImage} 
+              alt="Preview" 
+              className="max-w-full max-h-screen object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
