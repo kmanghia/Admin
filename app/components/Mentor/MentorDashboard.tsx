@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { Box, Grid, Typography } from "@mui/material";
+import { Box, Grid, Typography, Badge, IconButton, Tooltip } from "@mui/material";
 import {
   PeopleOutlinedIcon,
   BarChartOutlinedIcon,
@@ -9,20 +9,28 @@ import {
 } from "../Admin/sidebar/Icon";
 import { useSelector } from "react-redux";
 import { useGetMentorInfoQuery, useGetMentorStudentsQuery } from "@/redux/features/mentor/mentorApi";
+import { useGetMentorNotificationsQuery } from "@/redux/features/notifications/notificationsApi";
 import Loader from "../Loader/Loader";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import { useRouter } from "next/navigation";
 
 type Props = {};
 
 const MentorDashboard = (props: Props) => {
   const { user } = useSelector((state: any) => state.auth);
   const { theme } = useTheme();
+  const router = useRouter();
   const { data, isLoading, refetch } = useGetMentorInfoQuery({}, { refetchOnMountOrArgChange: true });
+  const { data: notificationsData, isLoading: notificationsLoading } = useGetMentorNotificationsQuery({}, 
+    { refetchOnMountOrArgChange: true, pollingInterval: 30000 });
+  
   const [totalCourses, setTotalCourses] = useState(0);
   const [totalStudents, setTotalStudents] = useState(0);
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [averageRating, setAverageRating] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const { isLoading: studentsLoading, data: studentsData } = useGetMentorStudentsQuery({}, { refetchOnMountOrArgChange: true });
 
   useEffect(() => {
@@ -43,6 +51,15 @@ const MentorDashboard = (props: Props) => {
       setAverageRating(data?.mentor?.averageRating || 0);
     }
   }, [data]);
+
+  useEffect(() => {
+    if (notificationsData?.success && notificationsData?.notifications) {
+      const unread = notificationsData.notifications.filter(
+        (notification: any) => notification.status === "unread"
+      ).length;
+      setUnreadNotifications(unread);
+    }
+  }, [notificationsData]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -76,6 +93,10 @@ const MentorDashboard = (props: Props) => {
     earnings: theme === "dark" ? 
       "linear-gradient(135deg, #00B09B 0%, #96C93D 100%)" : 
       "linear-gradient(135deg, #00B09B 0%, #96C93D 100%)"
+  };
+
+  const handleNotificationsClick = () => {
+    router.push("/mentor/notifications");
   };
 
   const StatCard = ({ title, value, icon: Icon, gradient }: any) => (
@@ -272,31 +293,70 @@ const MentorDashboard = (props: Props) => {
                 }
               }}
             >
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <motion.div variants={itemVariants}>
+                  <Typography
+                    variant="h2"
+                    sx={{
+                      color: theme === "dark" ? "#fff" : "#1a202c",
+                      fontWeight: "bold",
+                      background: "linear-gradient(90deg, #FF6B6B, #4158D0)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}
+                  >
+                    Xin chào, {user?.name}
+                  </Typography>
+                </motion.div>
+
+                <Tooltip title="Thông báo">
+                  <IconButton 
+                    onClick={handleNotificationsClick}
+                    sx={{
+                      backgroundColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
+                      p: 2,
+                      "&:hover": {
+                        backgroundColor: theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)",
+                      }
+                    }}
+                  >
+                    <Badge 
+                      badgeContent={unreadNotifications} 
+                      color="error"
+                      max={99}
+                      sx={{
+                        "& .MuiBadge-badge": {
+                          fontSize: "0.75rem",
+                          height: "20px",
+                          minWidth: "20px",
+                          fontWeight: "bold",
+                          padding: "0 6px"
+                        }
+                      }}
+                    >
+                      <NotificationsIcon 
+                        sx={{ 
+                          color: theme === "dark" ? "#fff" : "#4158D0",
+                          fontSize: "28px"
+                        }} 
+                      />
+                    </Badge>
+                  </IconButton>
+                </Tooltip>
+              </Box>
+
               <motion.div variants={itemVariants}>
                 <Typography
-                  variant="h2"
-                  sx={{
-                    color: theme === "dark" ? "#fff" : "#1a202c",
-                    fontWeight: "bold",
-                    mb: 2,
-                    background: "linear-gradient(90deg, #FF6B6B, #4158D0)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                  }}
-                >
-                  Xin chào, {user?.name}
-                </Typography>
-                    <Typography
-                      variant="h5"
+                  variant="h5"
                   sx={{
                     color: theme === "dark" ? "#a0aec0" : "#4a5568",
                     fontWeight: "normal"
                   }}
                 >
                   Chào mừng đến với bảng điều khiển giảng viên
-                    </Typography>
+                </Typography>
               </motion.div>
-                  </Box>
+            </Box>
 
             {/* Stats Grid */}
             <Grid container spacing={3} sx={{ mb: 5 }}>

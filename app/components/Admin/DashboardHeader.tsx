@@ -1,8 +1,8 @@
 "use client";
 import { ThemeSwitcher } from "@/app/utils/ThemeSwitcher";
 import {
-  useGetAllNotificationsQuery,
-  useUpdateNotificationStatusMutation,
+  useGetAdminNotificationsQuery,
+  useUpdateNotificationMutation,
 } from "@/redux/features/notifications/notificationsApi";
 import React, { FC, useEffect, useState } from "react";
 import { IoMdNotificationsOutline } from "react-icons/io";
@@ -17,11 +17,11 @@ type Props = {
 };
 
 const DashboardHeader: FC<Props> = ({ open, setOpen }) => {
-  const { data, refetch } = useGetAllNotificationsQuery(undefined, {
+  const { data, refetch } = useGetAdminNotificationsQuery(undefined, {
     refetchOnMountOrArgChange: true,//dữ liệu được tải lại mỗi khi component được mount
   });
   const [updateNotificationStatus, { isSuccess }] =
-    useUpdateNotificationStatusMutation();
+    useUpdateNotificationMutation();
   const [notifications, setNotifications] = useState<any>([]);
   const [audio] = useState<any>(
     typeof window !== "undefined" &&
