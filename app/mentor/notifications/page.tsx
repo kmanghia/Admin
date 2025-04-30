@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useGetMentorNotificationsQuery, useUpdateNotificationMutation } from "@/redux/features/notifications/notificationsApi";
 import { useTheme } from "next-themes";
 import {
@@ -23,6 +23,9 @@ import {
   Paper,
   Tooltip,
   Badge,
+  Snackbar,
+  Alert,
+  Button,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -39,12 +42,19 @@ import {
   Home as HomeIcon,
   NotificationsOutlined as NotificationsIcon,
   FilterList as FilterListIcon,
+  Notifications as NotificationsFullIcon,
+  BugReport as BugReportIcon,
 } from "@mui/icons-material";
+import socketIO from "socket.io-client";
 
 import Heading from "@/app/utils/Heading";
 import Link from "next/link";
 import MentorSidebar from "@/app/components/Mentor/MentorSidebar";
 import MentorHero from "@/app/components/Mentor/MentorHero";
+
+// Cấu hình socket giống như trong DashboardHeader
+const ENDPOINT = process.env.NEXT_PUBLIC_SOCKET_SERVER_URI || "http://localhost:8000";
+const socketId = socketIO(ENDPOINT, { transports: ["websocket"] });
 
 interface Notification {
   _id: string;
@@ -64,9 +74,94 @@ const NotificationsPage = () => {
   const [activeTab, setActiveTab] = useState<number>(0);
   const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>([]);
   const [active, setActive] = useState(8); // ID for notifications in sidebar
-
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [newNotification, setNewNotification] = useState<Notification | null>(null);
+  const [debug, setDebug] = useState<string[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
+  
   const { data, isLoading, refetch } = useGetMentorNotificationsQuery({}, { refetchOnMountOrArgChange: true });
   const [updateNotification] = useUpdateNotificationMutation();
+
+  // Hàm kiểm tra và log Socket.IO
+  const checkSocketConnection = () => {
+    addDebugLog(`Socket ID: ${socketId.id}`);
+    addDebugLog(`Socket connected: ${socketId.connected}`);
+    
+    // Gửi một sự kiện test đến server
+    socketId.emit("notification", {
+      title: "Test notification",
+      message: "This is a test notification from client",
+      recipientRole: "mentor",
+      type: "update"
+    });
+    
+    addDebugLog("Sent test notification event");
+  };
+  
+  const addDebugLog = (message: string) => {
+    const timestamp = new Date().toISOString().substring(11, 19);
+    setDebug(prev => [`[${timestamp}] ${message}`, ...prev.slice(0, 19)]);
+  };
+
+  // Socket.IO connection setup
+  useEffect(() => {
+    addDebugLog("Setting up socket listeners for notifications");
+    
+    // Lắng nghe sự kiện connect
+    socketId.on("connect", () => {
+      addDebugLog(`Socket connected with ID: ${socketId.id}`);
+    });
+    
+    // Lắng nghe sự kiện disconnect
+    socketId.on("disconnect", () => {
+      addDebugLog("Socket disconnected");
+    });
+    
+    // Lắng nghe sự kiện error
+    socketId.on("connect_error", (error) => {
+      addDebugLog(`Socket connection error: ${error.message}`);
+    });
+    
+    // Lắng nghe sự kiện cũ "newNotification" (tương thích với DashboardHeader)
+    socketId.on("newNotification", (notification: Notification) => {
+      addDebugLog(`Received newNotification: ${notification.title}`);
+      
+      // Hiển thị thông báo
+      setNewNotification(notification);
+      setOpenSnackbar(true);
+      
+      // Tự động refetch để cập nhật danh sách
+      refetch();
+    });
+    
+    // Lắng nghe sự kiện mới "new_notification"
+    socketId.on("new_notification", (notification: Notification) => {
+      addDebugLog(`Received new_notification: ${notification.title}`);
+      
+      // Hiển thị thông báo
+      setNewNotification(notification);
+      setOpenSnackbar(true);
+      
+      // Tự động refetch để cập nhật danh sách
+      refetch();
+    });
+    
+    // Lắng nghe sự kiện âm thanh thông báo
+    socketId.on("playNotificationSound", () => {
+      addDebugLog("Received playNotificationSound event");
+    });
+    
+    // Dọn dẹp khi component unmount
+    return () => {
+      addDebugLog("Cleaning up socket listeners");
+      socketId.off("connect");
+      socketId.off("disconnect");
+      socketId.off("connect_error");
+      socketId.off("newNotification");
+      socketId.off("new_notification");
+      socketId.off("playNotificationSound");
+    };
+  }, [refetch]);
 
   useEffect(() => {
     if (data?.notifications) {
@@ -98,6 +193,17 @@ const NotificationsPage = () => {
     // Navigate to the link if available
     if (notification.link) {
       router.push(notification.link);
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setOpenSnackbar(false);
+  };
+
+  const handleSnackbarClick = () => {
+    if (newNotification) {
+      handleNotificationClick(newNotification);
+      setOpenSnackbar(false);
     }
   };
 
@@ -169,6 +275,70 @@ const NotificationsPage = () => {
           <MentorHero />
           
           <Container maxWidth="lg" sx={{ py: 4 }}>
+            {/* Debug Panel */}
+            <Box 
+              sx={{
+                mb: 2,
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 1
+              }}
+            >
+              <Button
+                size="small"
+                startIcon={<BugReportIcon />}
+                variant={showDebug ? "contained" : "outlined"}
+                color="warning"
+                onClick={() => setShowDebug(!showDebug)}
+                sx={{ mb: 1 }}
+              >
+                {showDebug ? "Ẩn Debug" : "Hiển thị Debug"}
+              </Button>
+              
+              <Button
+                size="small"
+                startIcon={<UpdateIcon />}
+                variant="outlined"
+                color="primary"
+                onClick={checkSocketConnection}
+                sx={{ mb: 1 }}
+              >
+                Kiểm tra Socket
+              </Button>
+            </Box>
+            
+            {showDebug && (
+              <Card
+                elevation={0}
+                sx={{
+                  mb: 2,
+                  p: 2,
+                  borderRadius: "8px",
+                  bgcolor: theme === "dark" ? "#0f172a" : "#f8fafc",
+                  border: theme === "dark" ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(0,0,0,0.05)",
+                  overflow: "auto",
+                  maxHeight: "300px"
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                  Socket Debug Logs
+                </Typography>
+                <Box 
+                  component="pre"
+                  sx={{ 
+                    fontSize: "0.75rem",
+                    color: theme === "dark" ? "#94a3b8" : "#475569",
+                    m: 0,
+                    p: 0
+                  }}
+                >
+                  {debug.length === 0 ? "No logs yet..." : debug.map((log, i) => (
+                    <div key={i}>{log}</div>
+                  ))}
+                </Box>
+              </Card>
+            )}
+            
             <Card
               elevation={0}
               sx={{
@@ -203,13 +373,23 @@ const NotificationsPage = () => {
                     />
                   )}
                 </Box>
-                <Chip 
-                  icon={<FilterListIcon fontSize="small" />}
-                  label={activeTab === 0 ? "Tất cả" : activeTab === 1 ? "Chưa đọc" : "Đã đọc"}
-                  variant="outlined"
-                  color="primary"
-                  sx={{ borderRadius: "20px", fontWeight: 500 }}
-                />
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <IconButton 
+                    onClick={() => refetch()} 
+                    color="primary" 
+                    size="small"
+                    sx={{ mr: 1 }}
+                  >
+                    <UpdateIcon />
+                  </IconButton>
+                  <Chip 
+                    icon={<FilterListIcon fontSize="small" />}
+                    label={activeTab === 0 ? "Tất cả" : activeTab === 1 ? "Chưa đọc" : "Đã đọc"}
+                    variant="outlined"
+                    color="primary"
+                    sx={{ borderRadius: "20px", fontWeight: 500 }}
+                  />
+                </Box>
               </Box>
 
               {/* Tabs */}
@@ -412,6 +592,38 @@ const NotificationsPage = () => {
           </Container>
         </div>
       </div>
+
+      {/* Snackbar for realtime notifications */}
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity="info" 
+          variant="filled"
+          icon={<NotificationsFullIcon />}
+          sx={{ 
+            width: '100%', 
+            cursor: 'pointer', 
+            display: 'flex', 
+            alignItems: 'center',
+            bgcolor: getNotificationColor(newNotification?.type || 'default')
+          }}
+          onClick={handleSnackbarClick}
+        >
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              {newNotification?.title || 'Thông báo mới'}
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem', mt: 0.5 }}>
+              {newNotification?.message || ''}
+            </Typography>
+          </Box>
+        </Alert>
+      </Snackbar>
     </div>
   );
 };

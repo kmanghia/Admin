@@ -47,6 +47,7 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<any>(socketId);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [socketAuthenticated, setSocketAuthenticated] = useState(false);
   
   // Add attachments state
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -70,7 +71,7 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
     
     // Initialize socket
     if (mentorId) {
-      initializeSocket(mentorId);
+      authenticateSocket(mentorId);
     }
     
     return () => {
@@ -95,6 +96,24 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
       }
     };
   }, [chatId]);
+
+  // Authenticate socket with user ID
+  const authenticateSocket = (mentorId: string) => {
+    console.log("Authenticating socket with mentor ID:", mentorId);
+    
+    // Authenticate with server using the same format as mobile app
+    socketRef.current.emit("authenticate", {
+      userId: mentorId,
+      clientType: "web", 
+      clientId: `web_${Date.now()}`,
+      userRole: "mentor"
+    });
+    
+    setSocketAuthenticated(true);
+    
+    // Now initialize the socket for chat
+    initializeSocket(mentorId);
+  };
 
   // Update local chat state when data changes
   useEffect(() => {
@@ -127,12 +146,19 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
 
   // Socket initialization
   const initializeSocket = (user: string) => {
-    // Join the chat room
-    socketRef.current.emit('joinChat', { chatId, userId: user });
+    // Join the chat room - use string format like mobile app
+    socketRef.current.emit('joinChat', chatId);
+    
+    // Alternative format to ensure compatibility
+    // socketRef.current.emit('joinChat', { chatId, userId: user });
+    
+    console.log(`Joining chat room: ${chatId} as user ${user}`);
     
     // Listen for new messages
     socketRef.current.on('newMessage', (data: any) => {
       if (data.chatId === chatId) {
+        console.log("Received newMessage event:", data);
+        
         // Update chat with new message
         setChat(prevChat => {
           if (!prevChat) return null;
@@ -279,7 +305,16 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
 
   // Send message with attachments
   const sendMessage = () => {
-    if ((!message.trim() && attachments.length === 0) || !socketRef.current || !userId) return;
+    if ((!message.trim() && attachments.length === 0) || !socketRef.current || !userId || !socketAuthenticated) {
+      console.log("Cannot send message: ", {
+        message: message.trim(),
+        attachments: attachments.length,
+        socket: !!socketRef.current,
+        userId: !!userId,
+        authenticated: socketAuthenticated
+      });
+      return;
+    }
     
     try {
       const messageText = message.trim();
@@ -303,7 +338,14 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
         };
       });
       
-      // Then send to server
+      console.log("Sending message via socket:", {
+        chatId,
+        message: messageText,
+        senderId: userId,
+        attachments: attachments.length > 0 ? attachments : undefined
+      });
+      
+      // Match mobile app format exactly (simpler format like mobile app)
       socketRef.current.emit('sendMessage', {
         chatId,
         message: messageText,
@@ -744,9 +786,9 @@ const MentorChatDetail: FC<MentorChatDetailProps> = ({ chatId }) => {
           />
           <button
             onClick={sendMessage}
-            disabled={(!message.trim() && attachments.length === 0) || isUploading}
+            disabled={(!message.trim() && attachments.length === 0) || isUploading || !socketAuthenticated}
             className={`p-3 rounded-r-lg ${
-              (!message.trim() && attachments.length === 0) || isUploading
+              (!message.trim() && attachments.length === 0) || isUploading || !socketAuthenticated
                 ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed' 
                 : 'bg-blue-500 hover:bg-blue-600'
             } text-white transition-colors flex items-center justify-center`}
