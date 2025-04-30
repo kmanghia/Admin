@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { DataGrid } from "@mui/x-data-grid";
-import { Box, Button, Typography, Modal } from "@mui/material";
-import { AiOutlineDelete } from "react-icons/ai";
+import { DataGrid, GridToolbar } from "@mui/x-data-grid";
+import { Box, Button, Typography, Modal, TextField, InputAdornment } from "@mui/material";
+import { AiOutlineDelete, AiOutlineSearch, AiOutlineFileExcel } from "react-icons/ai";
 import { useTheme } from "next-themes";
 import { FiEdit2 } from "react-icons/fi";
 import { format } from "timeago.js";
@@ -15,6 +15,7 @@ import Loader from "@/app/components/Loader/Loader";
 import { toast } from "react-hot-toast";
 import { useGetMentorCoursesQuery } from "@/redux/features/mentor/mentorApi";
 import { useDeleteCourseMutation } from "@/redux/features/mentor/mentorCoursesApi";
+import * as XLSX from 'xlsx';
 
 type Props = {};
 
@@ -26,6 +27,8 @@ const MentorCourses = (props: Props) => {
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [courseIdToDelete, setCourseIdToDelete] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredRows, setFilteredRows] = useState<any[]>([]);
   const router = useRouter();
 
   const handleEdit = (id: string) => {
@@ -55,9 +58,55 @@ const MentorCourses = (props: Props) => {
       toast.error(error?.data?.message || "Lỗi khi xóa khóa học");
     }
   };
+  
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+  };
+  
+  const exportToExcel = () => {
+    try {
+      // Create a simplified version of the data for Excel
+      const exportData = filteredRows.map(row => ({
+        'Tên khóa học': row.title,
+        'Giá': row.price,
+        'Đã bán': row.purchased,
+        'Trạng thái': row.status === 'draft' 
+          ? 'Nháp'
+          : row.status === 'pending' 
+            ? 'Chờ duyệt' 
+            : row.status === 'active'
+              ? 'Hoạt động'
+              : 'Bị từ chối',
+        'Đánh giá': row.ratings
+      }));
+      
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Courses");
+      
+      // Column widths
+      const colWidths = [
+        { wch: 40 }, // Tên khóa học
+        { wch: 15 }, // Giá
+        { wch: 10 }, // Đã bán
+        { wch: 15 }, // Trạng thái
+        { wch: 10 }, // Đánh giá
+      ];
+      
+      worksheet['!cols'] = colWidths;
+      
+      // Generate file and trigger download
+      XLSX.writeFile(workbook, "danh_sach_khoa_hoc.xlsx");
+      
+      toast.success("Xuất file Excel thành công");
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+      toast.error("Có lỗi khi xuất file Excel");
+    }
+  };
 
   const columns = [
-    
     {
       field: "title",
       headerName: "Tên khóa học",
@@ -178,6 +227,31 @@ const MentorCourses = (props: Props) => {
       });
     });
   }
+  
+  // Filter rows based on search term
+  useEffect(() => {
+    if (rows.length > 0) {
+      if (!searchTerm) {
+        setFilteredRows(rows);
+        return;
+      }
+      
+      const lowercasedSearch = searchTerm.toLowerCase();
+      const filtered = rows.filter((row: any) => {
+        return (
+          row.title.toLowerCase().includes(lowercasedSearch) ||
+          row.status.toLowerCase().includes(lowercasedSearch) ||
+          (row.status === 'draft' && 'nháp'.includes(lowercasedSearch)) ||
+          (row.status === 'pending' && 'chờ duyệt'.includes(lowercasedSearch)) ||
+          (row.status === 'active' && 'hoạt động'.includes(lowercasedSearch)) ||
+          String(row.purchased).includes(searchTerm) ||
+          row.price.includes(searchTerm)
+        );
+      });
+      
+      setFilteredRows(filtered);
+    }
+  }, [searchTerm, rows]);
 
   return (
     <div className="mt-[30px]">
@@ -199,10 +273,10 @@ const MentorCourses = (props: Props) => {
                 Quản lý tất cả khóa học của bạn
               </Typography>
             </div>
-            <div>
+            <div className="flex gap-2">
               <Button
                 variant="contained"
-                color="primary"
+                color="success"
                 sx={{
                   backgroundColor: "#4CAF50",
                   boxShadow: "0px 4px 10px rgba(76, 175, 80, 0.25)",
@@ -216,8 +290,58 @@ const MentorCourses = (props: Props) => {
               >
                 Tạo khóa học mới
               </Button>
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<AiOutlineFileExcel />}
+                sx={{
+                  color: theme === "dark" ? "#fff" : "#1565c0",
+                  borderColor: theme === "dark" ? "#fff" : "#1565c0",
+                  "&:hover": {
+                    borderColor: theme === "dark" ? "#04d882" : "#1565c0",
+                    backgroundColor: theme === "dark" ? "rgba(4, 216, 130, 0.1)" : "rgba(21, 101, 192, 0.1)",
+                  },
+                  borderRadius: "8px",
+                  padding: "8px 16px",
+                }}
+                onClick={exportToExcel}
+              >
+                Xuất Excel
+              </Button>
             </div>
           </div>
+          
+          <Box sx={{ mt: 3, mb: 3 }}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Tìm kiếm khóa học theo tên, trạng thái, giá..."
+              value={searchTerm}
+              onChange={handleSearch}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <AiOutlineSearch color={theme === "dark" ? "#fff" : "#1565c0"} size={24} />
+                  </InputAdornment>
+                ),
+                sx: {
+                  borderRadius: "8px",
+                  backgroundColor: theme === "dark" ? "#1F2A40" : "#F8F9FA",
+                  color: theme === "dark" ? "#fff" : "#000",
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: theme === "dark" ? "#3e4396" : "#E0E3E7",
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: theme === "dark" ? "#04d882" : "#1565c0",
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: theme === "dark" ? "#04d882" : "#1565c0",
+                  },
+                }
+              }}
+            />
+          </Box>
+          
           <Box
             m="40px 0 0 0"
             height="75vh"
@@ -270,7 +394,18 @@ const MentorCourses = (props: Props) => {
               },
             }}
           >
-            <DataGrid checkboxSelection rows={rows} columns={columns} />
+            <DataGrid
+              checkboxSelection
+              rows={filteredRows}
+              columns={columns}
+              components={{ Toolbar: GridToolbar }}
+              componentsProps={{
+                toolbar: {
+                  showQuickFilter: true,
+                  quickFilterProps: { debounceMs: 500 },
+                },
+              }}
+            />
           </Box>
           
           {openDeleteModal && (

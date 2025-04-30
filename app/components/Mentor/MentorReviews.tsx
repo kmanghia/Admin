@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { Box, Typography, Rating, Paper, Avatar, Divider } from "@mui/material";
+import { Box, Typography, Rating, Paper, Avatar, Divider, TextField, InputAdornment } from "@mui/material";
 import { useTheme } from "next-themes";
 import { format } from "timeago.js";
 import { useGetMentorInfoQuery } from "@/redux/features/mentor/mentorApi";
 import Loader from "@/app/components/Loader/Loader";
+import {URL} from "@/app/utils/url";
+import { AiOutlineSearch } from "react-icons/ai";
 
 interface Review {
   _id: string;
   user: {
-    name: string;
-    avatar: {
-      url: string;
+    _id?: string;
+    name?: string;
+    avatar?: {
+      url?: string;
     };
   };
   rating: number;
@@ -23,13 +26,60 @@ const MentorReviews = () => {
   const { isLoading, data, refetch } = useGetMentorInfoQuery({}, { refetchOnMountOrArgChange: true });
   const [reviews, setReviews] = useState<Review[]>([]);
   const [averageRating, setAverageRating] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredReviews, setFilteredReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     if (data) {
+      console.log("Mentor reviews data:", data.mentor.reviews);
       setReviews(data.mentor.reviews || []);
+      setFilteredReviews(data.mentor.reviews || []);
       setAverageRating(data.mentor.averageRating || 0);
     }
   }, [data]);
+
+  // Filter reviews based on search term
+  useEffect(() => {
+    if (reviews.length > 0) {
+      if (!searchTerm) {
+        setFilteredReviews(reviews);
+        return;
+      }
+      
+      const lowercasedSearch = searchTerm.toLowerCase();
+      const filtered = reviews.filter((review: Review) => {
+        const userName = getUserName(review).toLowerCase();
+        const comment = review.comment.toLowerCase();
+        const ratingStr = review.rating.toString();
+        
+        return (
+          userName.includes(lowercasedSearch) ||
+          comment.includes(lowercasedSearch) ||
+          ratingStr.includes(searchTerm)
+        );
+      });
+      
+      setFilteredReviews(filtered);
+    }
+  }, [searchTerm, reviews]);
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+  };
+
+  // Function to get user display name with fallbacks
+  const getUserName = (review: Review): string => {
+    if (review?.user?.name) return review.user.name;
+    if (typeof review.user === 'string') return "Học viên";
+    return "Học viên";
+  };
+
+  // Function to get avatar URL with fallbacks
+  const getAvatarUrl = (review: Review): string => {
+    if (review?.user?.avatar?.url) return `${URL}/images/${review?.user?.avatar?.url}`;
+    return "/avatar.png";
+  };
 
   return (
     <>
@@ -55,7 +105,38 @@ const MentorReviews = () => {
               </Box>
             </Box>
 
-            {reviews.length === 0 ? (
+            <Box sx={{ mt: 3, mb: 3 }}>
+              <TextField
+                fullWidth
+                variant="outlined"
+                placeholder="Tìm kiếm theo tên học viên, nội dung đánh giá, số sao..."
+                value={searchTerm}
+                onChange={handleSearch}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <AiOutlineSearch color={theme === "dark" ? "#fff" : "#1565c0"} size={24} />
+                    </InputAdornment>
+                  ),
+                  sx: {
+                    borderRadius: "8px",
+                    backgroundColor: theme === "dark" ? "#1F2A40" : "#F8F9FA",
+                    color: theme === "dark" ? "#fff" : "#000",
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: theme === "dark" ? "#3e4396" : "#E0E3E7",
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: theme === "dark" ? "#04d882" : "#1565c0",
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: theme === "dark" ? "#04d882" : "#1565c0",
+                    },
+                  }
+                }}
+              />
+            </Box>
+
+            {filteredReviews.length === 0 ? (
               <Paper 
                 elevation={0} 
                 sx={{ 
@@ -66,11 +147,11 @@ const MentorReviews = () => {
                 }}
               >
                 <Typography variant="body1">
-                  Bạn chưa nhận được đánh giá nào từ học viên.
+                  {searchTerm ? "Không tìm thấy đánh giá phù hợp" : "Bạn chưa nhận được đánh giá nào từ học viên."}
                 </Typography>
               </Paper>
             ) : (
-              reviews.map((review) => (
+              filteredReviews.map((review) => (
                 <Paper
                   key={review._id}
                   elevation={0}
@@ -83,15 +164,15 @@ const MentorReviews = () => {
                 >
                   <Box display="flex" alignItems="center" mb={2}>
                     <Avatar 
-                      src={review?.user?.avatar?.url || "/avatar.png"} 
-                      alt={review?.user?.name || "User"}
+                      src={getAvatarUrl(review)} 
+                      alt={getUserName(review)}
                       sx={{ width: 40, height: 40, mr: 1 }}
                     />
                     <Box>
                       <Typography variant="body1" fontWeight="bold">
-                        {review?.user?.name || "Học viên"}
+                        {getUserName(review)}
                       </Typography>
-                      <Typography variant="caption" color="textSecondary">
+                      <Typography variant="caption" color="textPrimary">
                         {review.createdAt ? format(review.createdAt) : ""}
                       </Typography>
                     </Box>
