@@ -3,12 +3,12 @@ import { Box, Typography, Paper, TextField, InputAdornment, Avatar, Button, Divi
 import { useTheme } from "next-themes";
 import { format } from "timeago.js";
 import { useGetMentorCoursesQuery } from "@/redux/features/mentor/mentorCoursesApi";
+import { useAnswerQuestionMutation } from "@/redux/features/mentor/mentorApi";
 import Loader from "@/app/components/Loader/Loader";
 import { AiOutlineSearch, AiOutlineSend } from "react-icons/ai";
 import { MdExpandMore } from "react-icons/md";
 import { toast } from "react-hot-toast";
 import { URL, URL_SERVER } from "@/app/utils/url";
-import axios from "axios";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -76,6 +76,7 @@ interface Question {
 const MentorDiscussions = () => {
   const { theme } = useTheme();
   const { isLoading, data: coursesData, refetch } = useGetMentorCoursesQuery({}, { refetchOnMountOrArgChange: true });
+  const [answerQuestion, { isLoading: isAnswering }] = useAnswerQuestionMutation();
   
   const [tabValue, setTabValue] = useState(0);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -214,15 +215,13 @@ const MentorDiscussions = () => {
     try {
       setLoading(true);
       
-      // Use the exact API endpoint from course.route.ts
-      await axios.put(`${URL_SERVER}/add-answer`, {
+      // Use the Redux mutation instead of direct axios call
+      await answerQuestion({
         answer: answers[questionId],
         courseId,
         contentId,
         questionId
-      }, {
-        withCredentials: true
-      });
+      }).unwrap();
       
       toast.success("Đã trả lời câu hỏi thành công");
       setAnswers({
