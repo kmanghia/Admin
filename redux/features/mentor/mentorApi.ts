@@ -50,6 +50,24 @@ export const mentorApi = apiSlice.injectEndpoints({
       }),
     }),
     
+    getMentorDiscussions: builder.query({
+      query: () => ({
+        url: "course-discussions",
+        method: "GET",
+        credentials: "include" as const,
+      }),
+      
+    }),
+    
+    getCourseDiscussions: builder.query({
+      query: (courseId) => ({
+        url: `course-discussions/${courseId}`,
+        method: "GET",
+        credentials: "include" as const,
+      }),
+  
+    }),
+    
     updateMentorStatus: builder.mutation({
       query: ({ mentorId, status }) => ({
         url: "update-status",
@@ -66,6 +84,21 @@ export const mentorApi = apiSlice.injectEndpoints({
         body: { mentorId, rating, comment },
         credentials: "include" as const,
       }),
+    }),
+    
+    answerQuestion: builder.mutation({
+      query: ({ answer, courseId, contentId, questionId }) => ({
+        url: "add-answer",
+        method: "PUT",
+        body: {
+          answer,
+          courseId,
+          contentId,
+          questionId,
+        },
+        credentials: "include" as const,
+      }),
+     
     }),
     
     registerAsMentor: builder.mutation({
@@ -86,7 +119,10 @@ export const {
   useGetMentorInfoQuery,
   useGetMentorCoursesQuery,
   useGetMentorStudentsQuery,
+  useGetMentorDiscussionsQuery,
+  useGetCourseDiscussionsQuery,
   useUpdateMentorStatusMutation,
   useReviewMentorMutation,
+  useAnswerQuestionMutation,
   useRegisterAsMentorMutation,
 } = mentorApi; 

@@ -8,6 +8,7 @@ import { TbReportAnalytics } from "react-icons/tb";
 import { IoHomeOutline } from "react-icons/io5";
 import { IoMdLogOut } from "react-icons/io";
 import { FaRegComments } from "react-icons/fa";
+import { BiConversation } from "react-icons/bi";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import Image from "next/image";
@@ -104,6 +105,12 @@ const MentorSidebar: FC<Props> = ({ active, setActive }) => {
       path: "/mentor/chats",
       id: 7,
       badge: unreadData?.unreadCount || 0,
+    },
+    {
+      icon: <BiConversation className="text-xl" />,
+      title: "Thảo luận bài học",
+      path: "/mentor/discussions",
+      id: 8,
     },
   ];
 
