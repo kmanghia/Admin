@@ -29,10 +29,20 @@ const MentorCourses = (props: Props) => {
   const [courseIdToDelete, setCourseIdToDelete] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredRows, setFilteredRows] = useState<any[]>([]);
+  const [openEditModal, setOpenEditModal] = useState(false);
+  const [courseIdToEdit, setCourseIdToEdit] = useState("");
   const router = useRouter();
 
   const handleEdit = (id: string) => {
-    router.push(`/mentor/edit-course/${id}`);
+    setCourseIdToEdit(id);
+    setOpenEditModal(true);
+  };
+  
+  const confirmEdit = () => {
+    if (!courseIdToEdit) return;
+    console.log("Redirecting to:", `/mentor/edit-course/${courseIdToEdit}`);
+    window.location.href = `/mentor/edit-course/${courseIdToEdit}`;
+    setOpenEditModal(false);
   };
 
   const handleSubmit = async (id: string) => {
@@ -161,7 +171,13 @@ const MentorCourses = (props: Props) => {
       flex: 0.2,
       renderCell: (params: any) => {
         return (
-          <Button onClick={() => handleEdit(params.row.id)}>
+          <Button 
+            onClick={() => handleEdit(params.row.id)}
+            sx={{ 
+              minWidth: 'auto',
+              padding: '5px'
+            }}
+          >
             <FiEdit2 className="dark:text-white text-black" size={20} />
           </Button>
         );
@@ -431,6 +447,35 @@ const MentorCourses = (props: Props) => {
                     onClick={handleDelete}
                   >
                     Xóa
+                  </div>
+                </div>
+              </Box>
+            </Modal>
+          )}
+          
+          {openEditModal && (
+            <Modal
+              open={openEditModal}
+              onClose={() => setOpenEditModal(false)}
+              aria-labelledby="modal-modal-title"
+              aria-describedby="modal-modal-description"
+            >
+              <Box className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[450px] bg-white dark:bg-slate-900 rounded-[8px] shadow p-4 outline-none">
+                <h1 className={`${styles.title}`}>
+                  Bạn có chắc chắn muốn chỉnh sửa khóa học này?
+                </h1>
+                <div className="flex w-full items-center justify-between mb-6 mt-4">
+                  <div
+                    className={`${styles.button} !w-[120px] h-[30px] bg-[#d63f3f]`}
+                    onClick={() => setOpenEditModal(false)}
+                  >
+                    Hủy
+                  </div>
+                  <div
+                    className={`${styles.button} !w-[120px] h-[30px] bg-[#47d097]`}
+                    onClick={confirmEdit}
+                  >
+                    Có
                   </div>
                 </div>
               </Box>

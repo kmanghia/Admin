@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Typography, Grid, Paper } from "@mui/material";
 import { useTheme } from "next-themes";
 import { useGetMentorCoursesQuery } from "@/redux/features/mentor/mentorCoursesApi";
+import { useGetMentorStudentsQuery } from "@/redux/features/mentor/mentorApi";
 import Loader from "@/app/components/Loader/Loader";
 import { Bar, Line, Pie } from "react-chartjs-2";
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend } from "chart.js";
@@ -21,7 +22,8 @@ Chart.register(
 
 const MentorAnalytics = () => {
   const { theme } = useTheme();
-  const { isLoading, data } = useGetMentorCoursesQuery({}, { refetchOnMountOrArgChange: true });
+  const { isLoading: isCoursesLoading, data: coursesData } = useGetMentorCoursesQuery({}, { refetchOnMountOrArgChange: true });
+  const { isLoading: isStudentsLoading, data: studentsData } = useGetMentorStudentsQuery({}, { refetchOnMountOrArgChange: true });
   
   const [courseStats, setCourseStats] = useState<any>({
     totalCourses: 0,
@@ -35,15 +37,11 @@ const MentorAnalytics = () => {
   const [ratingDistribution, setRatingDistribution] = useState<any[]>([]);
 
   useEffect(() => {
-    if (data && data.courses) {
+    if (coursesData && coursesData.courses) {
       let totalStudents = 0;
       let totalRevenue = 0;
       let totalRatings = 0;
       let totalRatingCount = 0;
-      
-      // Data for monthly revenue
-      const monthlyData: { [key: string]: number } = {};
-      const currentYear = new Date().getFullYear();
       
       // Data for course distribution
       const courseData: { [key: string]: number } = {};
@@ -57,7 +55,7 @@ const MentorAnalytics = () => {
         "1 sao": 0,
       };
       
-      data.courses.forEach((course: any) => {
+      coursesData.courses.forEach((course: any) => {
         // Add course to distribution
         courseData[course.name] = course.purchased || 0;
         
@@ -81,45 +79,15 @@ const MentorAnalytics = () => {
             else if (review.rating === 1) ratingData["1 sao"]++;
           });
         }
-        
-        // Process monthly revenue (if purchase details exist)
-        if (course.purchaseDetails && course.purchaseDetails.length > 0) {
-          course.purchaseDetails.forEach((purchase: any) => {
-            const purchaseDate = new Date(purchase.date);
-            
-            // Only consider current year
-            if (purchaseDate.getFullYear() === currentYear) {
-              const monthKey = purchaseDate.getMonth(); // 0-11
-              
-              // Add to monthly revenue
-              if (!monthlyData[monthKey]) {
-                monthlyData[monthKey] = 0;
-              }
-              monthlyData[monthKey] += course.price;
-            }
-          });
-        }
       });
       
       // Set stats
       setCourseStats({
-        totalCourses: data.courses.length,
+        totalCourses: coursesData.courses.length,
         totalStudents,
         totalRevenue,
         averageRating: totalRatingCount > 0 ? (totalRatings / totalRatingCount).toFixed(1) : 0,
       });
-      
-      // Generate monthly revenue data for chart
-      const monthlyRevData = [];
-      const months = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
-      
-      for (let i = 0; i < 12; i++) {
-        monthlyRevData.push({
-          month: months[i],
-          revenue: monthlyData[i] || 0,
-        });
-      }
-      setMonthlyRevenue(monthlyRevData);
       
       // Generate course distribution data
       const courseDistData = Object.keys(courseData).map(name => ({
@@ -135,7 +103,49 @@ const MentorAnalytics = () => {
       }));
       setRatingDistribution(ratingDistData);
     }
-  }, [data]);
+  }, [coursesData]);
+  
+  // Process monthly revenue based on student purchase dates
+  useEffect(() => {
+    if (studentsData && studentsData.students) {
+      // Data for monthly revenue
+      const monthlyData: { [key: string]: number } = {};
+      const currentYear = new Date().getFullYear();
+      
+      studentsData.students.forEach((student: any) => {
+        if (student.courses && student.courses.length > 0) {
+          student.courses.forEach((course: any) => {
+            if (course.purchaseDate) {
+              const purchaseDate = new Date(course.purchaseDate);
+              
+              // Only consider current year
+              if (purchaseDate.getFullYear() === currentYear) {
+                const monthKey = purchaseDate.getMonth(); // 0-11
+                
+                // Add to monthly revenue
+                if (!monthlyData[monthKey]) {
+                  monthlyData[monthKey] = 0;
+                }
+                monthlyData[monthKey] += course.price;
+              }
+            }
+          });
+        }
+      });
+      
+      // Generate monthly revenue data for chart
+      const monthlyRevData = [];
+      const months = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
+      
+      for (let i = 0; i < 12; i++) {
+        monthlyRevData.push({
+          month: months[i],
+          revenue: monthlyData[i] || 0,
+        });
+      }
+      setMonthlyRevenue(monthlyRevData);
+    }
+  }, [studentsData]);
 
   // Chart data
   const monthlyRevenueData = {
@@ -231,7 +241,7 @@ const MentorAnalytics = () => {
 
   return (
     <div className="mt-[30px]">
-      {isLoading ? (
+      {isCoursesLoading || isStudentsLoading ? (
         <Loader />
       ) : (
         <Box m="20px">

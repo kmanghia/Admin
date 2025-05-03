@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { DataGrid } from "@mui/x-data-grid";
+import { DataGrid, GridToolbar } from "@mui/x-data-grid";
 import { Box, Button, Modal, TextField, Typography } from "@mui/material";
 import { AiOutlineDelete } from "react-icons/ai";
 import { useTheme } from "next-themes";
@@ -240,7 +240,12 @@ const PendingCourses = (props: Props) => {
               },
             }}
           >
-            <DataGrid checkboxSelection rows={rows} columns={columns} />
+            <DataGrid 
+              checkboxSelection 
+              rows={rows} 
+              columns={columns} 
+              components={{ Toolbar: GridToolbar }}
+            />
           </Box>
         </Box>
       )}

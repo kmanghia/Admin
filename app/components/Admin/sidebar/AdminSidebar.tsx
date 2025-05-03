@@ -163,7 +163,6 @@ const AdminSidebar = () => {
     "/admin": "Dashboard",
     "/admin/users": "Người dùng",
     "/admin/invoices": "Hóa đơn",
-    "/admin/create-course": "Tạo khóa học",
     "/admin/courses": "Khóa học",
     "/admin/faq": "FAQ",
     "/admin/categories": "Danh mục",
@@ -377,13 +376,6 @@ const AdminSidebar = () => {
               <Box className="mt-6 mb-2">
                 <CategoryLabel>Nội dung</CategoryLabel>
               </Box>
-              <Item
-                title="Tạo khóa học"
-                to="/admin/create-course"
-                icon={<VideoCallIcon className="text-gray-600 dark:text-gray-300" />}
-                selected={selected}
-                setSelected={setSelected}
-              />
               <Item
                 title="Khóa học"
                 to="/admin/courses"
