@@ -1,16 +1,25 @@
-import React, { useEffect, useState } from "react";
-import { Box, Typography, Rating, Paper, Avatar, Divider, TextField, InputAdornment, Tabs, Tab } from "@mui/material";
+import React, { useEffect, useState, useCallback } from "react";
+import { Box, Typography, Rating, Paper, Avatar, Divider, TextField, InputAdornment, Tabs, Tab, Button, IconButton } from "@mui/material";
 import { useTheme } from "next-themes";
 import { format } from "timeago.js";
 import { useGetMentorInfoQuery } from "@/redux/features/mentor/mentorApi";
 import { useGetMentorCoursesQuery } from "@/redux/features/mentor/mentorCoursesApi";
+import { 
+  useAddReplyToCourseReviewMutation,
+  useAddReplyToMentorReviewMutation,
+  useGetMentorReviewsQuery,
+  useGetMentorCourseReviewsQuery
+} from "@/redux/features/review/reviewApi";
 import Loader from "@/app/components/Loader/Loader";
 import {URL} from "@/app/utils/url";
 import { AiOutlineSearch } from "react-icons/ai";
+import toast from "react-hot-toast";
+import { FaReply } from "react-icons/fa";
+import { MdClose } from "react-icons/md";
 
 interface Review {
   _id: string;
-  user: {
+  userId: {
     _id?: string;
     name?: string;
     avatar?: {
@@ -20,11 +29,26 @@ interface Review {
   rating: number;
   comment: string;
   createdAt: string;
+  replies?: ReplyData[];
+}
+
+interface ReplyData {
+  _id?: string;
+  user_id: {
+    _id?: string;
+    name?: string;
+    avatar?: {
+      url?: string;
+    };
+  };
+  content: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 interface CourseReview {
   _id: string;
-  user: {
+  userId: {
     _id?: string;
     name?: string;
     avatar?: {
@@ -36,6 +60,7 @@ interface CourseReview {
   createdAt: string;
   courseId?: string;
   courseName?: string;
+  replies?: ReplyData[];
 }
 
 interface TabPanelProps {
@@ -76,6 +101,23 @@ const MentorReviews = () => {
   const { isLoading: isMentorLoading, data: mentorData } = useGetMentorInfoQuery({}, { refetchOnMountOrArgChange: true });
   const { isLoading: isCoursesLoading, data: coursesData } = useGetMentorCoursesQuery({}, { refetchOnMountOrArgChange: true });
   
+  // Add the review API hooks
+  const [addReplyToCourseReview, { isLoading: isReplySubmittingCourse }] = useAddReplyToCourseReviewMutation();
+  const [addReplyToMentorReview, { isLoading: isReplySubmittingMentor }] = useAddReplyToMentorReviewMutation();
+  const [mentorId, setMentorId] = useState<string | undefined>(undefined);
+  
+  // Use our new API endpoints
+  const { data: mentorReviewsData, isLoading: isMentorReviewsLoading, refetch: refetchMentorReviews } = useGetMentorReviewsQuery(mentorId, {
+    skip: !mentorId,
+    refetchOnMountOrArgChange: true
+  });
+  
+  // Add the new endpoint for mentor course reviews
+  const { data: mentorCourseReviewsData, isLoading: isMentorCourseReviewsLoading, refetch: refetchMentorCourseReviews } = useGetMentorCourseReviewsQuery(mentorId, {
+    skip: !mentorId,
+    refetchOnMountOrArgChange: true
+  });
+  
   const [tabValue, setTabValue] = useState(0);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [courseReviews, setCourseReviews] = useState<CourseReview[]>([]);
@@ -85,46 +127,46 @@ const MentorReviews = () => {
   const [filteredCourseReviews, setFilteredCourseReviews] = useState<CourseReview[]>([]);
   const [courseAverageRating, setCourseAverageRating] = useState(0);
   const [totalCourseReviews, setTotalCourseReviews] = useState(0);
+  
+  // New state for reply functionality
+  const [replyText, setReplyText] = useState("");
+  const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
+  // Set mentorId when mentor data is available
   useEffect(() => {
-    if (mentorData) {
-      console.log("Mentor reviews data:", mentorData.mentor.reviews);
-      setReviews(mentorData.mentor.reviews || []);
-      setFilteredReviews(mentorData.mentor.reviews || []);
+    if (mentorData && mentorData.mentor && mentorData.mentor._id) {
+      setMentorId(mentorData.mentor._id);
       setAverageRating(mentorData.mentor.averageRating || 0);
     }
   }, [mentorData]);
 
-  // Extract course reviews from courses data
+  // Update reviews when mentor reviews data changes
   useEffect(() => {
-    if (coursesData && coursesData.courses) {
-      const allCourseReviews: CourseReview[] = [];
-      let totalRating = 0;
-      let reviewCount = 0;
-      
-      coursesData.courses.forEach((course: any) => {
-        if (course.reviews && course.reviews.length > 0) {
-          course.reviews.forEach((review: any) => {
-            allCourseReviews.push({
-              ...review,
-              courseId: course._id,
-              courseName: course.name
-            });
-            
-            totalRating += review.rating;
-            reviewCount++;
-          });
-        }
-      });
-      
-      setCourseReviews(allCourseReviews);
-      setFilteredCourseReviews(allCourseReviews);
-      setTotalCourseReviews(allCourseReviews.length);
-      setCourseAverageRating(reviewCount > 0 ? totalRating / reviewCount : 0);
+    if (mentorReviewsData && mentorReviewsData.reviews) {
+      setReviews(mentorReviewsData.reviews || []);
+      setFilteredReviews(mentorReviewsData.reviews || []);
     }
-  }, [coursesData]);
+  }, [mentorReviewsData]);
+  
+  // Update course reviews when mentor course reviews data changes
+  useEffect(() => {
+    if (mentorCourseReviewsData && mentorCourseReviewsData.reviews) {
+      const courseReviewsData = mentorCourseReviewsData.reviews || [];
+      setCourseReviews(courseReviewsData);
+      setFilteredCourseReviews(courseReviewsData);
+      setTotalCourseReviews(courseReviewsData.length);
+      
+      // Calculate average rating
+      if (courseReviewsData.length > 0) {
+        const totalRating = courseReviewsData.reduce((sum: number, review: CourseReview) => sum + review.rating, 0);
+        const avgRating = totalRating / courseReviewsData.length;
+        setCourseAverageRating(avgRating);
+      }
+    }
+  }, [mentorCourseReviewsData]);
 
-  // Filter reviews based on search term
+  // Handle search filtering
   useEffect(() => {
     if (reviews.length > 0) {
       if (!searchTerm) {
@@ -172,28 +214,24 @@ const MentorReviews = () => {
   }, [searchTerm, reviews, courseReviews]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchTerm(value);
+    setSearchTerm(e.target.value);
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
-  // Function to get user display name with fallbacks
   const getUserName = (review: Review | CourseReview): string => {
-    if (review?.user?.name) return review.user.name;
-    if (typeof review.user === 'string') return "Học viên";
+    if (review?.userId?.name) return review.userId.name;
+    if (typeof review.userId === 'string') return "Học viên";
     return "Học viên";
   };
 
-  // Function to get avatar URL with fallbacks
   const getAvatarUrl = (review: Review | CourseReview): string => {
-    if (review?.user?.avatar?.url) return `${URL}/images/${review?.user?.avatar?.url}`;
+    if (review?.userId?.avatar?.url) return `${URL}/images/${review.userId.avatar.url}`;
     return "/avatar.png";
   };
 
-  // Group course reviews by course
   const groupedCourseReviews = filteredCourseReviews.reduce((acc: Record<string, CourseReview[]>, review) => {
     const courseName = review.courseName || "Khóa học khác";
     if (!acc[courseName]) {
@@ -202,6 +240,113 @@ const MentorReviews = () => {
     acc[courseName].push(review);
     return acc;
   }, {});
+
+  // Handle reply submission for mentor reviews
+  const handleMentorReplySubmit = async (reviewId: string) => {
+    if (!replyText.trim()) {
+      toast.error("Vui lòng nhập nội dung phản hồi");
+      return;
+    }
+    
+    try {
+      const response = await addReplyToMentorReview({
+        comment: replyText,
+        reviewId,
+      }).unwrap();
+      
+      if (response.success) {
+        toast.success("Đã phản hồi đánh giá thành công");
+        setReplyText("");
+        setActiveReplyId(null);
+        
+        // Refresh mentor reviews
+        if (mentorId) {
+          refetchMentorReviews();
+        }
+      }
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || "Có lỗi xảy ra khi gửi phản hồi";
+      toast.error(errorMessage);
+    }
+  };
+
+  // Handle reply submission for course reviews 
+  const handleCourseReplySubmit = async (courseId: string, reviewId: string) => {
+    if (!replyText.trim()) {
+      toast.error("Vui lòng nhập nội dung phản hồi");
+      return;
+    }
+    
+    try {
+      setSelectedCourseId(courseId);
+      
+      const response = await addReplyToCourseReview({
+        comment: replyText,
+        reviewId,
+      }).unwrap();
+      
+      if (response.success) {
+        toast.success("Đã phản hồi đánh giá thành công");
+        setReplyText("");
+        setActiveReplyId(null);
+        
+        // Refresh appropriate data based on the current tab
+        if (mentorId) {
+          refetchMentorCourseReviews();
+        }
+      }
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || "Có lỗi xảy ra khi gửi phản hồi";
+      toast.error(errorMessage);
+    } finally {
+      setSelectedCourseId(null);
+    }
+  };
+
+  const toggleReplyForm = (reviewId: string) => {
+    if (activeReplyId === reviewId) {
+      setActiveReplyId(null);
+      setReplyText("");
+    } else {
+      setActiveReplyId(reviewId);
+      setReplyText("");
+    }
+  };
+
+  const renderReply = (reply: ReplyData) => {
+    return (
+      <Box 
+        key={reply._id} 
+        sx={{ 
+          pl: 4, 
+          pt: 1, 
+          pb: 1,
+          borderLeft: `2px solid ${theme === "dark" ? "#3e4396" : "#E0E3E7"}`,
+          ml: 2,
+          mt: 1
+        }}
+      >
+        <Box display="flex" alignItems="center" mb={1}>
+          <Avatar 
+            src={reply?.user_id?.avatar?.url ? `${URL}/images/${reply.user_id.avatar.url}` : "/avatar.png"} 
+            alt={reply?.user_id?.name || "Người dùng"}
+            sx={{ width: 30, height: 30, mr: 1 }}
+          />
+          <Box>
+            <Typography variant="body2" fontWeight="bold">
+              {reply?.user_id?.name || "Người dùng"}
+            </Typography>
+            <Typography variant="caption" color="textPrimary">
+              {reply.createdAt ? format(reply.createdAt) : ""}
+            </Typography>
+          </Box>
+        </Box>
+        <Typography variant="body2" sx={{ ml: 5 }}>
+          {reply.content}
+        </Typography>
+      </Box>
+    );
+  };
 
   return (
     <>
@@ -282,7 +427,9 @@ const MentorReviews = () => {
                 </Typography>
               </Box>
               
-              {filteredReviews.length === 0 ? (
+              {isMentorReviewsLoading ? (
+                <Loader />
+              ) : filteredReviews.length === 0 ? (
                 <Paper 
                   elevation={0} 
                   sx={{ 
@@ -322,14 +469,78 @@ const MentorReviews = () => {
                           {review.createdAt ? format(review.createdAt) : ""}
                         </Typography>
                       </Box>
-                      <Box ml="auto">
+                      <Box ml="auto" display="flex" alignItems="center">
                         <Rating value={review.rating} precision={0.5} readOnly size="small" />
+                        <IconButton 
+                          size="small" 
+                          onClick={() => toggleReplyForm(review._id)}
+                          sx={{ 
+                            ml: 1,
+                            color: theme === "dark" ? "#04d882" : "#1565c0" 
+                          }}
+                        >
+                          {activeReplyId === review._id ? <MdClose /> : <FaReply />}
+                        </IconButton>
                       </Box>
                     </Box>
                     <Divider sx={{ mb: 2 }} />
                     <Typography variant="body1">
                       {review.comment}
                     </Typography>
+                    
+                    {review.replies && review.replies.length > 0 && (
+                      <Box mt={2}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>
+                          Phản hồi:
+                        </Typography>
+                        {review.replies.map((reply) => renderReply(reply))}
+                      </Box>
+                    )}
+                    
+                    {activeReplyId === review._id && (
+                      <Box mt={2}>
+                        <TextField
+                          fullWidth
+                          multiline
+                          rows={2}
+                          placeholder="Nhập phản hồi của bạn..."
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          variant="outlined"
+                          size="small"
+                          sx={{
+                            backgroundColor: theme === "dark" ? "#283046" : "#F8F9FA",
+                            '& .MuiOutlinedInput-root': {
+                              '& fieldset': {
+                                borderColor: theme === "dark" ? "#3e4396" : "#E0E3E7",
+                              },
+                              '&:hover fieldset': {
+                                borderColor: theme === "dark" ? "#04d882" : "#1565c0",
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: theme === "dark" ? "#04d882" : "#1565c0",
+                              },
+                            },
+                          }}
+                        />
+                        <Box display="flex" justifyContent="flex-end" mt={1}>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            disabled={isReplySubmittingMentor || !replyText.trim()}
+                            onClick={() => handleMentorReplySubmit(review._id)}
+                            sx={{
+                              backgroundColor: theme === "dark" ? "#04d882" : "#1565c0",
+                              '&:hover': {
+                                backgroundColor: theme === "dark" ? "#03b66f" : "#0d47a1",
+                              },
+                            }}
+                          >
+                            {isReplySubmittingMentor ? "Đang gửi..." : "Gửi phản hồi"}
+                          </Button>
+                        </Box>
+                      </Box>
+                    )}
                   </Paper>
                 ))
               )}
@@ -343,7 +554,9 @@ const MentorReviews = () => {
                 </Typography>
               </Box>
               
-              {filteredCourseReviews.length === 0 ? (
+              {isMentorCourseReviewsLoading ? (
+                <Loader />
+              ) : filteredCourseReviews.length === 0 ? (
                 <Paper 
                   elevation={0} 
                   sx={{ 
@@ -394,14 +607,78 @@ const MentorReviews = () => {
                               {review.createdAt ? format(review.createdAt) : ""}
                             </Typography>
                           </Box>
-                          <Box ml="auto">
+                          <Box ml="auto" display="flex" alignItems="center">
                             <Rating value={review.rating} precision={0.5} readOnly size="small" />
+                            <IconButton 
+                              size="small" 
+                              onClick={() => toggleReplyForm(review._id)}
+                              sx={{ 
+                                ml: 1,
+                                color: theme === "dark" ? "#04d882" : "#1565c0" 
+                              }}
+                            >
+                              {activeReplyId === review._id ? <MdClose /> : <FaReply />}
+                            </IconButton>
                           </Box>
                         </Box>
                         <Divider sx={{ mb: 2 }} />
                         <Typography variant="body1">
                           {review.comment}
                         </Typography>
+                        
+                        {review.replies && review.replies.length > 0 && (
+                          <Box mt={2}>
+                            <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>
+                              Phản hồi:
+                            </Typography>
+                            {review.replies.map((reply) => renderReply(reply))}
+                          </Box>
+                        )}
+                        
+                        {activeReplyId === review._id && (
+                          <Box mt={2}>
+                            <TextField
+                              fullWidth
+                              multiline
+                              rows={2}
+                              placeholder="Nhập phản hồi của bạn..."
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              variant="outlined"
+                              size="small"
+                              sx={{
+                                backgroundColor: theme === "dark" ? "#283046" : "#F8F9FA",
+                                '& .MuiOutlinedInput-root': {
+                                  '& fieldset': {
+                                    borderColor: theme === "dark" ? "#3e4396" : "#E0E3E7",
+                                  },
+                                  '&:hover fieldset': {
+                                    borderColor: theme === "dark" ? "#04d882" : "#1565c0",
+                                  },
+                                  '&.Mui-focused fieldset': {
+                                    borderColor: theme === "dark" ? "#04d882" : "#1565c0",
+                                  },
+                                },
+                              }}
+                            />
+                            <Box display="flex" justifyContent="flex-end" mt={1}>
+                              <Button
+                                variant="contained"
+                                size="small"
+                                disabled={isReplySubmittingCourse || !replyText.trim()}
+                                onClick={() => handleCourseReplySubmit(review.courseId || "", review._id)}
+                                sx={{
+                                  backgroundColor: theme === "dark" ? "#04d882" : "#1565c0",
+                                  '&:hover': {
+                                    backgroundColor: theme === "dark" ? "#03b66f" : "#0d47a1",
+                                  },
+                                }}
+                              >
+                                {isReplySubmittingCourse ? "Đang gửi..." : "Gửi phản hồi"}
+                              </Button>
+                            </Box>
+                          </Box>
+                        )}
                       </Paper>
                     ))}
                   </Box>
